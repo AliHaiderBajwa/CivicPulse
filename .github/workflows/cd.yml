@@ -151,6 +151,14 @@ jobs:
           IMAGE_BASE: ${{ needs.publish.outputs.image_base }}
           SHA: ${{ github.sha }}
 
+      - name: Install the VPA CRD first (kubectl cannot map a CR in the same stream)
+        run: |
+          set -euo pipefail
+          kubectl apply -k k8s/crds
+          kubectl wait --for=condition=Established --timeout=60s \
+            crd/verticalpodautoscalers.autoscaling.k8s.io
+          kubectl get crd | grep autoscaling.k8s.io
+
       - name: Deploy overlay at commit SHA (dev on dev, prod on main)
         run: |
           set -euo pipefail

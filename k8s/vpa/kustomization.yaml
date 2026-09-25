@@ -1,0 +1,9 @@
+# The VPA recommender: cluster-scoped RBAC + the recommender Deployment.
+# Install AFTER k8s/crds. Not part of the base overlay on purpose: the
+# recommender needs metrics.k8s.io, so a throwaway CI cluster without
+# metrics-server gains nothing from it (see docs/evidence/13-vpa.txt).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - vpa-rbac.yaml
+  - recommender-deployment.yaml
