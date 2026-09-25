@@ -69,7 +69,7 @@ One box per rubric line. Tick only when **evidence exists** (code, screenshot, l
 - [ ] I4 cd.yml with needs: gating publish, images pushed to GHCR tagged by commit SHA — 4
 - [ ] I5 Kubernetes deploy job on ephemeral cluster, waiting on rollout status and smoke-testing the Ingress — 3
 - [ ] I6 secrets from GitHub Secrets with scoped token and least-privilege permissions: block — 2
-- [ ] I7 evidence of a red pipeline blocking a merge, then green — 1
+- [x] I7 evidence of a red pipeline blocking a merge, then green — 1
 
 ## J · Documentation, portfolio and reflection — 15
 - [ ] J1 README.md: problem statement, badges, Mermaid architecture diagram, working one-command quickstart, API table, screenshots — 4

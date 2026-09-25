@@ -45,3 +45,32 @@ Required status checks (all 7 contexts above) are configured on branch
 protection for `dev` and `main`. A PR whose checks are red cannot be merged
 until they pass; `gh pr merge` rejects it. Demonstrated live on the red
 -> fix -> green cycle above and enforced from then on.
+
+LIVE MERGE-BLOCK DEMONSTRATION (PR #16, chore/i7-red-demo -> dev)
+-----------------------------------------------------------------
+1. Commit 8b53934 added a deliberately failing Vitest test.
+   Run 36161473886 (head 8b53934): test-frontend = FAIL, overall failure.
+
+2. Merge attempted while RED:
+   $ gh pr merge 16 --squash
+   X Pull request #16 is not mergeable: the base branch policy prohibits
+     the merge.
+   To have the pull request merged after all the requirements have been
+   met, add the `--auto` flag.
+   To use administrator privileges to immediately merge the pull request,
+   add the `--admin` flag.
+   => the required status checks blocked the merge. This is the captured
+      red-blocks-merge evidence.
+
+3. Commit 16fdb77 removed the test. Run 36161597740 (head 16fdb77):
+   all checks = success (run conclusion: success).
+
+4. PR #16 merged (squash 3eb895d) with a fully green head; the demo file
+   is NOT in the merged tree (added then removed, net zero). Branch
+   chore/i7-red-demo deleted.
+
+Note on ordering: the post-fix merge call raced GitHub's check-registration
+window for the new head SHA (gh pr checks reported "no checks reported"
+moments before). The red-state block in step 2 is the authoritative
+protection proof; the final head of the PR ran all 7 checks green before
+the demo was considered complete.
