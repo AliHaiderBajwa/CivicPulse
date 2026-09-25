@@ -1,0 +1,74 @@
+CD evidence — ephemeral cluster deploy by commit SHA (rubric I4/I5/I6)
+run: https://github.com/AliHaiderBajwa/CivicPulse/actions/runs/36170624771
+commit: f17dc383363fa845aa1f6238323c01ba21696819  (branch dev)
+captured: 2026-09-25T18:05:46Z  by: scripts/cd-evidence.sh (log verbatim)
+
+== job chain (build -> publish -> deploy-k8s, each gated by needs:) ==
+  build: success
+  publish: success
+  deploy-k8s: success
+
+== I4: images published to GHCR tagged by commit SHA (never :latest) ==
+  published: ghcr.io/alihaiderbajwa/civicpulse-frontend:f17dc383363fa845aa1f6238323c01ba21696819
+  published: ghcr.io/alihaiderbajwa/civicpulse-backend:f17dc383363fa845aa1f6238323c01ba21696819
+
+== I4/I5: deploy-by-SHA rewrite actually applied to the overlay ==
+          image: ghcr.io/alihaiderbajwa/civicpulse-backend:f17dc383363fa845aa1f6238323c01ba21696819
+          image: ghcr.io/alihaiderbajwa/civicpulse-frontend:f17dc383363fa845aa1f6238323c01ba21696819
+
+== VPA CRD installed in a separate stream before the overlay (fresh-cluster fix) ==
+  customresourcedefinition.apiextensions.k8s.io/verticalpodautoscalercheckpoints.autoscaling.k8s.io created
+  customresourcedefinition.apiextensions.k8s.io/verticalpodautoscalers.autoscaling.k8s.io created
+  customresourcedefinition.apiextensions.k8s.io/verticalpodautoscalers.autoscaling.k8s.io condition met
+
+== I5: rollout status waited for every workload ==
+  deployment "ingress-nginx-controller" successfully rolled out
+  deployment "backend" successfully rolled out
+  deployment "frontend" successfully rolled out
+  deployment "redis" successfully rolled out
+
+== I5: Ingress smoke (GET /, GET /api/stats, POST /api/complaints) ==
+  POST /api/complaints -> 201
+  ingress smoke OK
+
+== I6: secret plumbing — key names only, values never printed ==
+  secret key: DATABASE_URL
+  secret key: LLM_API_KEY
+  secret key: POSTGRES_PASSWORD
+  LLM_API_KEY resolved from GitHub Secrets (masked as *** in the run log)
+  repository secrets (gh secret list):
+    LLM_API_KEY	2026-09-25T17:50:45Z
+
+== I6: least-privilege permissions, nothing granted at workflow level ==
+  top-level permissions: {}
+  build: {'contents': 'read'}  needs=None
+  publish: {'contents': 'read', 'packages': 'write'}  needs=build
+  deploy-k8s: {'contents': 'read', 'packages': 'read'}  needs=publish
+
+== I5: final cluster state (ephemeral kind) ==
+kubectl -n civicpulse get deploy,sts,svc,ingress,hpa,pdb -o wide || true
+kubectl get nodes -o wide || true
+shell: /usr/bin/bash -e {0}
+env:
+  KIND_VERSION: v0.30.0
+  INGRESS_NGINX_KIND: https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.12.1/deploy/static/provider/kind/deploy.yaml
+NAME                       READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS   IMAGES                                                                                SELECTOR
+deployment.apps/backend    2/2     2            2           11s   backend      ghcr.io/alihaiderbajwa/civicpulse-backend:f17dc383363fa845aa1f6238323c01ba21696819    app=backend
+deployment.apps/frontend   2/2     2            2           11s   frontend     ghcr.io/alihaiderbajwa/civicpulse-frontend:f17dc383363fa845aa1f6238323c01ba21696819   app=frontend
+deployment.apps/redis      1/1     1            1           11s   redis        redis:7-alpine                                                                        app=cache
+NAME                        READY   AGE   CONTAINERS   IMAGES
+statefulset.apps/postgres   1/1     11s   postgres     postgres:16-alpine
+NAME               TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE   SELECTOR
+service/backend    ClusterIP   10.96.152.235   <none>        8000/TCP   11s   app=backend
+service/cache      ClusterIP   10.96.246.113   <none>        6379/TCP   11s   app=cache
+service/database   ClusterIP   10.96.224.112   <none>        5432/TCP   11s   app=database
+service/frontend   ClusterIP   10.96.122.244   <none>        8080/TCP   11s   app=frontend
+NAME                                   CLASS   HOSTS                  ADDRESS   PORTS   AGE
+ingress.networking.k8s.io/civicpulse   nginx   civicpulse.localhost             80      9s
+NAME                                          REFERENCE            TARGETS              MINPODS   MAXPODS   REPLICAS   AGE
+horizontalpodautoscaler.autoscaling/backend   Deployment/backend   cpu: <unknown>/60%   2         10        0          9s
+NAME                                 MIN AVAILABLE   MAX UNAVAILABLE   ALLOWED DISRUPTIONS   AGE
+poddisruptionbudget.policy/backend   1               N/A               1                     11s
+NAME                       STATUS   ROLES           AGE   VERSION   INTERNAL-IP   EXTERNAL-IP   OS-IMAGE                         KERNEL-VERSION      CONTAINER-RUNTIME
+civicpulse-control-plane   Ready    control-plane   68s   v1.34.0   172.18.0.2    <none>        Debian GNU/Linux 12 (bookworm)   6.17.0-1022-azure   containerd://2.1.3
+﻿2026-09-25T18:02:55.9776533Z Post job cleanup.

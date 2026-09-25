@@ -27,3 +27,4 @@ remain responsible for every line.
 - Every AI-authored commit uses the same conventional-commit style as the
   human partners and is pushed only through `dev`.
 - The AI agent does not author partner-review approvals — reviews are human.
+| M6 cd | `.github/workflows/cd.yml` (build→publish→deploy-k8s), vendored VPA CRD + recommender, `scripts/cd-evidence.sh` | Four defects found by actually running the pipeline (unbound `env` twice, missing VPA CRD, `needs` scoping) — each reproduced in a red run before the fix; actionlint added as a pre-push gate; the real Groq key was never sent to GitHub (placeholder secret only) |

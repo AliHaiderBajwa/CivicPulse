@@ -66,9 +66,9 @@ One box per rubric line. Tick only when **evidence exists** (code, screenshot, l
 - [x] I1 ci.yml lint+typecheck+tests on every PR, configured as required checks — 4
 - [x] I2 compose integration smoke job asserting real request path end to end — 3
 - [x] I3 Trivy image scan and kubeconform manifest validation in CI — 3
-- [ ] I4 cd.yml with needs: gating publish, images pushed to GHCR tagged by commit SHA — 4
-- [ ] I5 Kubernetes deploy job on ephemeral cluster, waiting on rollout status and smoke-testing the Ingress — 3
-- [ ] I6 secrets from GitHub Secrets with scoped token and least-privilege permissions: block — 2
+- [x] I4 cd.yml with needs: gating publish, images pushed to GHCR tagged by commit SHA — 4
+- [x] I5 Kubernetes deploy job on ephemeral cluster, waiting on rollout status and smoke-testing the Ingress — 3
+- [x] I6 secrets from GitHub Secrets with scoped token and least-privilege permissions: block — 2
 - [x] I7 evidence of a red pipeline blocking a merge, then green — 1
 
 ## J · Documentation, portfolio and reflection — 15

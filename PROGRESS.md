@@ -110,4 +110,27 @@ Regenerate the docx after every entry: `python3 scripts/build_docx.py`.
 
 **Next:** commit M5 artifacts; P6 `cd.yml` (I4/I5/I6); save k3d bring-up as `scripts/k8s-up.sh`; then P7 docs/J-block (README, diagrams, screenshots) and watch for Ashar's backend PRs.
 
+## M6 — P6: CD pipeline green end to end (Ali + AI agent)
+
+**Expected:** `cd.yml` gating publish with `needs:`, images pushed to GHCR tagged by commit SHA, a Kubernetes deploy on an ephemeral cluster that waits on rollout status and smoke-tests the Ingress, and secrets supplied from GitHub Secrets under a scoped token with least-privilege permissions.
+
+**Achieved:**
+- **`.github/workflows/cd.yml`** — `build` → `publish` → `deploy-k8s`, each gated by `needs:`. `build` compiles both images with `push: false`; `publish` pushes **only** `:${github.sha}` (never `latest`) and then asserts both tags exist in the registry via `docker manifest inspect`; `deploy-k8s` may not start unless that assertion passed.
+- **Ephemeral kind cluster** (kind v0.30.0, pinned) with `extraPortMappings 80:80`, pinned ingress-nginx kind provider (`controller-v1.12.1`), node labelled `ingress-ready=true`, the published SHA images `kind load`ed, then `dev` overlay on `dev` / `prod` overlay on `main`.
+- **Deploy by SHA:** the overlay's `newTag` placeholder is rewritten to the commit SHA and the rendered `image:` lines are echoed as proof before apply. Rendered manifests asserted locally: no `latest`, no `prod-0000000` survives.
+- **Rollout + smoke (I5):** `rollout status` for `deploy/backend`, `deploy/frontend`, `sts/postgres`, `deploy/redis`; then Ingress smoke — `GET /` 200, `GET /api/stats` 200, `POST /api/complaints` **201** with `id` + `triaged_by`.
+- **I6 least privilege:** top-level `permissions: {}`; `build` = `contents:read`; `publish` = `+packages:write`; `deploy-k8s` = `+packages:read` (pull only). `LLM_API_KEY` read from GitHub Secrets (repository secret set to a **non-credential placeholder**; the real Groq key stays in the local `.env`). The committed placeholder Secret is replaced at deploy time with a freshly generated DB password; only key *names* are printed.
+- **Three real defects found by running it, all fixed:**
+  1. `IMAGE_BASE` unbound in the registry assertion (a rewrite had dropped its `env:`) → `set -u` killed publish *after* both images had pushed; `deploy-k8s` correctly stayed skipped, so nothing deployed. Fixed by restoring the `env:`.
+  2. Same class of bug one job later: the `kind load` step had lost its `env:` too, so `docker` got an empty ref and exited 125. Fixed, and a mechanical audit now resolves every `${VAR}` in every `run:` block before push.
+  3. **A fresh cluster could not deploy at all**: `kubectl apply` died with `no matches for kind "VerticalPodAutoscaler"` because the VPA CRD lived only in my local k3d cluster. The CRD is now **vendored** (`k8s/crds/`, from `kubernetes/autoscaler @ vertical-pod-autoscaler-1.7.1`) and installed in a separate apply stream before the overlays, because kubectl cannot map a custom resource in the same stream that installs its CRD. Re-applying locally reports `unchanged`, so the vendored copy matches what was installed by hand. The recommender (RBAC + Deployment) is vendored under `k8s/vpa/` too — kept out of the base overlay on purpose, since it needs `metrics.k8s.io` and a throwaway kind cluster has no metrics-server.
+- `actionlint v1.7.7` runs clean over both workflows; it caught a genuine `needs.build` vs `needs.publish` scoping bug that would have sent an empty image name to the deploy job.
+- CI `manifests` now validates the vendored dirs too: `k8s/vpa` strict (**26/26 valid**); `k8s/crds` is **schema-skipped on purpose** — kubeconform's default catalogue ships no `apiextensions.k8s.io` schema (404 at every k8s version), so the honest proof is the CD job installing the CRD into a live API server and waiting for `Established` (`docs/evidence/19-cd-deploy.txt`).
+
+**Red→green trail (honest):** `36169675730` publish failed on the unbound `IMAGE_BASE` → `36169949655` deploy failed with docker exit 125 → `36170243505` deploy failed on the missing VPA CRD → **`36170624771` build+publish+deploy-k8s all success**.
+
+**Evidence:** `docs/evidence/19-cd-deploy.txt` (captured by `scripts/cd-evidence.sh`, which asserts the four facts that make the capture meaningful: SHA tags, rollouts, smoke OK, secret keys); run `36170624771`; CI `36170624655` (manifests job updated).
+
+**Next:** tick I4/I5/I6; save the k3d bring-up as `scripts/k8s-up.sh`; then P7/J-block (README, Mermaid diagrams, screenshots, runbook) and the AI layer, watching for Ashar's backend PRs.
+
 <!-- New entries above this line. -->
