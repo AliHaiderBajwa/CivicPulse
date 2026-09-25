@@ -1,0 +1,25 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+# Production triage runs against the hosted LLM; the rules fallback still
+# guarantees 201 if the provider is down (triaged_by = rules:fallback).
+patches:
+  - patch: |-
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: civicpulse-config
+        namespace: civicpulse
+      data:
+        TRIAGE_PROVIDER: llm
+
+# Deploy-by-SHA: CD rewrites these tags to ${{ github.sha }} before apply.
+# NEVER :latest. The committed placeholder proves the mechanism exists.
+images:
+  - name: ghcr.io/alihaiderbajwa/civicpulse-backend
+    newTag: prod-0000000
+  - name: ghcr.io/alihaiderbajwa/civicpulse-frontend
+    newTag: prod-0000000

@@ -1,0 +1,107 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: civicpulse
+  labels:
+    app: backend
+    app.kubernetes.io/part-of: civicpulse
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1          # never drop below desired during rollout
+      maxUnavailable: 0    # zero-downtime by construction
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+        app.kubernetes.io/part-of: civicpulse
+    spec:
+      terminationGracePeriodSeconds: 30 # time for in-flight requests to drain
+      containers:
+        - name: backend
+          image: ghcr.io/alihaiderbajwa/civicpulse-backend:dev
+          ports:
+            - name: http
+              containerPort: 8000
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: civicpulse-secrets
+                  key: DATABASE_URL
+            - name: LLM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: civicpulse-secrets
+                  key: LLM_API_KEY
+            - name: REDIS_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: civicpulse-config
+                  key: REDIS_URL
+            - name: TRIAGE_PROVIDER
+              valueFrom:
+                configMapKeyRef:
+                  name: civicpulse-config
+                  key: TRIAGE_PROVIDER
+            - name: LLM_BASE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: civicpulse-config
+                  key: LLM_BASE_URL
+            - name: LLM_MODEL
+              valueFrom:
+                configMapKeyRef:
+                  name: civicpulse-config
+                  key: LLM_MODEL
+            - name: RATE_LIMIT_PER_MIN
+              valueFrom:
+                configMapKeyRef:
+                  name: civicpulse-config
+                  key: RATE_LIMIT_PER_MIN
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: civicpulse-config
+                  key: LOG_LEVEL
+          # --- probes: startup absorbs slow boots, liveness restarts a wedged
+          # process WITHOUT touching the database, readiness gates the Service
+          # ON the database. Wiring these backwards turns a slow DB into a
+          # restart loop across the whole deployment.
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            failureThreshold: 30
+            periodSeconds: 2
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "5"] # leave Service endpoints before draining
+          resources:
+            requests:
+              cpu: 100m        # HPA computes usage / request — no request, no HPA
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi

@@ -189,7 +189,10 @@ jobs:
           tar -xzf /tmp/kustomize.tgz -C /tmp kustomize
           curl -fsSL -o /tmp/kubeconform.tgz "https://github.com/yannh/kubeconform/releases/download/v0.8.0/kubeconform-linux-amd64.tar.gz"
           tar -xzf /tmp/kubeconform.tgz -C /tmp kubeconform
-          /tmp/kustomize build k8s/overlays/prod | /tmp/kubeconform -strict -summary -
+          /tmp/kustomize build k8s/overlays/prod | /tmp/kubeconform -strict -summary \
+            -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            -
 
       - name: Manifests not present yet
         if: ${{ hashFiles('k8s/overlays/prod/kustomization.yaml') == '' }}

@@ -9,7 +9,12 @@ COPY tsconfig.json vite.config.ts index.html ./
 COPY src ./src
 RUN npm run build
 
-FROM nginx:1.27-alpine
+FROM nginx:1.30.5-alpine3.24
+
+# Security: apply all available package fixes for this Alpine branch so the
+# Trivy gate (HIGH/CRITICAL with a fix available) passes. Base is pinned by
+# version + Alpine release, never :latest.
+RUN apk upgrade --no-cache
 
 # Non-root compatible main config: pid + temp under /tmp, logs to stdout/stderr.
 RUN sed -i \

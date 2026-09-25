@@ -1,0 +1,14 @@
+# Protects the backend against voluntary disruption (node drains, upgrades):
+# at least one backend pod must always be available.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: backend
+  namespace: civicpulse
+  labels:
+    app.kubernetes.io/part-of: civicpulse
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: backend
