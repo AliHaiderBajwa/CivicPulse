@@ -142,10 +142,14 @@ jobs:
 
       - name: Load the published SHA images into kind
         run: |
+          set -euo pipefail
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
           docker pull "${IMAGE_BASE}-frontend:${SHA}"
           docker pull "${IMAGE_BASE}-backend:${SHA}"
           kind load docker-image "${IMAGE_BASE}-frontend:${SHA}" "${IMAGE_BASE}-backend:${SHA}" --name civicpulse
+        env:
+          IMAGE_BASE: ${{ needs.publish.outputs.image_base }}
+          SHA: ${{ github.sha }}
 
       - name: Deploy overlay at commit SHA (dev on dev, prod on main)
         run: |
