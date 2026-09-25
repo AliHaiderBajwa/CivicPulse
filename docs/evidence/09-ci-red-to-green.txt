@@ -1,0 +1,47 @@
+CivicPulse — CI red pipeline → green pipeline evidence (rubric I7)
+==================================================================
+
+Repository: https://github.com/AliHaiderBajwa/CivicPulse
+Workflow:   .github/workflows/ci.yml  (7 jobs: lint-and-type, test-backend,
+            test-frontend, build, scan, manifests, integration)
+
+RED RUNS
+--------
+1. Run 36157508384  head=2433916  conclusion=failure
+   - manifests: plain YAML scalar treated " #11)" as a comment, truncating
+     the notice echo and leaving an unmatched quote.
+   - scan: aquasecurity/trivy-action referenced without the required "v"
+     tag prefix.
+   Jobs affected: scan, manifests. (Integration/others already green.)
+
+2. Run 36157889109  head=bc52b78  conclusion=failure
+   - manifests fixed, scan ran for real and FAILED THE SECURITY GATE:
+     Total: 40 vulnerabilities (HIGH: 38, CRITICAL: 2) in the frontend
+     image built from nginx:1.27-alpine, all with fixes available
+     (ignore-unfixed=true) => job exit code 1.
+
+FIXES (commits bc52b78, 37f1f1c)
+---------------------------------
+- ci.yml: block scalar for the notice quote; trivy-action pinned @v0.36.0;
+  kubeconform given the CRDs-catalog schema location (VPA CRD).
+- frontend/Dockerfile: base bumped to nginx:1.30.5-alpine3.24 (still pinned
+  by version, never :latest) + `apk upgrade --no-cache` so every fixable
+  CVE in that Alpine branch is applied.
+
+GREEN RUN
+---------
+Run 36159826654  head=37f1f1c  conclusion=success
+  lint-and-type   success
+  test-backend    success (coverage gate >= 65%)
+  test-frontend   success (15 Vitest tests)
+  build           success
+  scan            success (no fixable HIGH/CRITICAL remain)
+  manifests       success (kustomize prod overlay -> kubeconform 16/16)
+  integration     success (compose smoke, real request path)
+
+How the pipeline blocks merges
+------------------------------
+Required status checks (all 7 contexts above) are configured on branch
+protection for `dev` and `main`. A PR whose checks are red cannot be merged
+until they pass; `gh pr merge` rejects it. Demonstrated live on the red
+-> fix -> green cycle above and enforced from then on.

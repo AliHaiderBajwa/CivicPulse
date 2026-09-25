@@ -14,7 +14,7 @@ One box per rubric line. Tick only when **evidence exists** (code, screenshot, l
 - [x] B2 Dashboard: pagination, filters, status transitions, server's 409 message verbatim — 5
 - [x] B3 Stats view rendering aggregates and cache-hit state from X-Cache — 3
 - [x] B4 runtime config — no baked-in API URL; one image runs in any environment — 3
-- [ ] B5 ≥5 meaningful component tests passing in CI — 2
+- [x] B5 ≥5 meaningful component tests passing in CI — 2
 
 ## C · Backend — 25
 - [ ] C1 all endpoints to contract, correct status codes, field-level validation errors — 7
@@ -63,9 +63,9 @@ One box per rubric line. Tick only when **evidence exists** (code, screenshot, l
 - [ ] H6 VPA recommender mode, recommendations committed, requests updated in response, HPA/VPA conflict explained — 3
 
 ## I · CI/CD — 20
-- [ ] I1 ci.yml lint+typecheck+tests on every PR, configured as required checks — 4
-- [ ] I2 compose integration smoke job asserting real request path end to end — 3
-- [ ] I3 Trivy image scan and kubeconform manifest validation in CI — 3
+- [x] I1 ci.yml lint+typecheck+tests on every PR, configured as required checks — 4
+- [x] I2 compose integration smoke job asserting real request path end to end — 3
+- [x] I3 Trivy image scan and kubeconform manifest validation in CI — 3
 - [ ] I4 cd.yml with needs: gating publish, images pushed to GHCR tagged by commit SHA — 4
 - [ ] I5 Kubernetes deploy job on ephemeral cluster, waiting on rollout status and smoke-testing the Ingress — 3
 - [ ] I6 secrets from GitHub Secrets with scoped token and least-privilege permissions: block — 2

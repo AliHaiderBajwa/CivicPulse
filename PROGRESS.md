@@ -72,4 +72,22 @@ Regenerate the docx after every entry: `python3 scripts/build_docx.py`.
 
 **Next:** P4 `ci.yml` (then tick B5 + required status checks), watch for Ashar's backend PRs (Issues 1,3,4,5,6,10), P5 K8s.
 
+## M4 — P4: CI pipeline green ×7 + required checks (Ali + AI agent)
+
+**Expected:** `ci.yml` with lint/type, backend tests (cov ≥65), frontend tests, image build, Trivy scan, kubeconform manifest validation, and a compose integration smoke job — running on every PR, configured as required status checks, with red→green evidence.
+
+**Achieved:**
+- `.github/workflows/ci.yml` — 7 jobs: `lint-and-type`, `test-backend` (pytest cov ≥65), `test-frontend` (15 Vitest), `build` (no push), `scan` (Trivy, HIGH/CRITICAL, ignore-unfixed), `manifests` (kustomize prod → kubeconform -strict + CRDs-catalog schema, 16/16), `integration` (compose stub/full paths `hashFiles`-gated, real request path).
+- **Two red runs, diagnosed and fixed honestly:**
+  1. `36157508384` — plain YAML scalar ate a ` #` (comment) mid-string + trivy-action needs the `v` tag prefix → block scalar + `@v0.36.0`.
+  2. `36157889109` — Trivy gate did its job: **40 fixable CVEs (38 HIGH, 2 CRITICAL)** in `nginx:1.27-alpine` → base bumped to pinned `nginx:1.30.5-alpine3.24` + `apk upgrade --no-cache`.
+- **Green run `36159826654` (37f1f1c): all 7 jobs success.**
+- Required status checks (all 7 contexts) now enforced on **`dev`** (no review gate — green-only merges) and **`main`** (PR + 1 approval + checks).
+- Evidence written: `docs/evidence/09-ci-red-to-green.txt`; AI disclosure: `docs/AI-USAGE.md`.
+- Rubric: ticked B5, I1, I2, I3.
+
+**Evidence:** `docs/evidence/09-ci-red-to-green.txt`; `gh run view 36159826654`; branch protection API responses; commits `78408bb`, `bc52b78`, `37f1f1c`.
+
+**Next:** live red-blocks-merge demo for I7; P5 k3d bring-up + deploy of `k8s/overlays/dev` (pause courier containers first — ask user); then P6 `cd.yml`.
+
 <!-- New entries above this line. -->
