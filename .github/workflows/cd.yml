@@ -1,0 +1,215 @@
+# CD pipeline — rubric I4 (needs: gated, GHCR by commit SHA), I5 (ephemeral
+# cluster deploy + rollout status + Ingress smoke), I6 (scoped tokens, secrets).
+#
+# Chain: build -> publish -> deploy-k8s. No job may publish or deploy without
+# the previous stage succeeding, and no job runs on a pull_request from a fork.
+name: cd
+
+on:
+  push:
+    branches: [dev, main]
+  workflow_dispatch:
+
+# Nothing by default: every job opts into exactly the scopes it needs (I6).
+permissions: {}
+
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: false # never kill a deploy mid-flight
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    outputs:
+      image_base: ${{ steps.base.outputs.value }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Image namespace (GHCR rejects uppercase)
+        id: base
+        run: |
+          echo "value=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build frontend (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: false
+          tags: ${{ steps.base.outputs.value }}-frontend:${{ github.sha }}
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+
+      - name: Build backend (real backend once backend/ lands, stub until then)
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ hashFiles('backend/Dockerfile') != '' && './backend' || './tools/stub-backend' }}
+          push: false
+          tags: ${{ steps.base.outputs.value }}-backend:${{ github.sha }}
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+  publish:
+    needs: build # gated: never publish without a successful build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write # least privilege: push to GHCR only
+    outputs:
+      image_base: ${{ needs.build.outputs.image_base }} # forwarded for deploy
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR with the scoped GITHUB_TOKEN
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push frontend tagged by commit SHA
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: true
+          tags: ${{ needs.build.outputs.image_base }}-frontend:${{ github.sha }}
+          cache-from: type=gha,scope=frontend
+
+      - name: Push backend tagged by commit SHA
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ hashFiles('backend/Dockerfile') != '' && './backend' || './tools/stub-backend' }}
+          push: true
+          tags: ${{ needs.build.outputs.image_base }}-backend:${{ github.sha }}
+          cache-from: type=gha,scope=backend
+
+      - name: Assert both SHA tags exist in the registry
+        run: |
+          set -euo pipefail
+          for image in frontend backend; do
+            ref="${IMAGE_BASE}-${image}:${GITHUB_SHA}"
+            docker manifest inspect "$ref" >/dev/null
+            echo "published: $ref"
+          done
+
+  deploy-k8s:
+    needs: publish # gated: deploy only after the SHA images are published
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      packages: read # pull our own freshly pushed images, nothing more
+    env:
+      KIND_VERSION: v0.30.0
+      INGRESS_NGINX_KIND: https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.12.1/deploy/static/provider/kind/deploy.yaml
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install kind (pinned)
+        run: |
+          curl -fsSL -o /tmp/kind "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-amd64"
+          chmod +x /tmp/kind && sudo mv /tmp/kind /usr/local/bin/kind
+          kind version
+
+      - name: Create ephemeral cluster (host :80 -> Ingress)
+        run: |
+          cat > /tmp/kind-config.yaml <<'EOF'
+          kind: Cluster
+          apiVersion: kind.x-k8s.io/v1alpha4
+          name: civicpulse
+          nodes:
+            - role: control-plane
+              extraPortMappings:
+                - containerPort: 80
+                  hostPort: 80
+                  protocol: TCP
+          EOF
+          kind create cluster --config /tmp/kind-config.yaml --wait 120s
+
+      - name: Install ingress-nginx (kind provider, pinned)
+        run: |
+          kubectl label node civicpulse-control-plane ingress-ready=true --overwrite
+          kubectl apply -f "$INGRESS_NGINX_KIND"
+          kubectl -n ingress-nginx rollout status deploy/ingress-nginx-controller --timeout=180s
+
+      - name: Load the published SHA images into kind
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker pull "${IMAGE_BASE}-frontend:${SHA}"
+          docker pull "${IMAGE_BASE}-backend:${SHA}"
+          kind load docker-image "${IMAGE_BASE}-frontend:${SHA}" "${IMAGE_BASE}-backend:${SHA}" --name civicpulse
+
+      - name: Deploy overlay at commit SHA (dev on dev, prod on main)
+        run: |
+          set -euo pipefail
+          OVERLAY=dev
+          if [ "${GITHUB_REF}" = "refs/heads/main" ]; then OVERLAY=prod; fi
+          # The overlays carry the `images:` transformers with a placeholder tag
+          # (dev / prod-0000000). Rewriting the tag is the deploy-by-SHA step --
+          # never :latest (AGENTS.md hard rule).
+          sed -i -E "s|newTag: .*|newTag: ${SHA}|" "k8s/overlays/${OVERLAY}/kustomization.yaml"
+          kubectl kustomize "k8s/overlays/${OVERLAY}" > /tmp/manifest.yaml
+          grep -E '^\s+image:' /tmp/manifest.yaml
+          kubectl apply -f /tmp/manifest.yaml
+          # Base carries no ingressClassName (each environment's default
+          # controller serves it); name the kind controller explicitly.
+          kubectl -n civicpulse patch ingress civicpulse --type=merge \
+            -p '{"spec":{"ingressClassName":"nginx"}}'
+          # Secret placeholders are committed on purpose; the live values are
+          # created here from GitHub Secrets and a fresh random DB password.
+          PW="$(openssl rand -hex 12)"
+          kubectl create secret generic civicpulse-secrets \
+            --namespace civicpulse \
+            --from-literal=POSTGRES_PASSWORD="$PW" \
+            --from-literal="DATABASE_URL=postgresql+psycopg://civicpulse:${PW}@database:5432/civicpulse" \
+            --from-literal="LLM_API_KEY=${LLM_API_KEY}" \
+            --dry-run=client -o yaml | kubectl replace -f -
+          # Key names only -- values are never echoed into the log.
+          kubectl -n civicpulse get secret civicpulse-secrets -o json \
+            | jq -r '.data | keys[]' | sed 's/^/secret key: /'
+        env:
+          IMAGE_BASE: ${{ needs.publish.outputs.image_base }}
+          SHA: ${{ github.sha }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+
+      - name: Wait for rollout (deployments + statefulset)
+        run: |
+          set -euo pipefail
+          kubectl -n civicpulse rollout status deploy/backend --timeout=180s
+          kubectl -n civicpulse rollout status deploy/frontend --timeout=180s
+          kubectl -n civicpulse rollout status sts/postgres --timeout=180s
+          kubectl -n civicpulse rollout status deploy/redis --timeout=180s
+          kubectl -n civicpulse get pods -o wide
+
+      - name: Smoke the Ingress end to end
+        run: |
+          set -euo pipefail
+          H='Host: civicpulse.localhost'
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' -H "$H" http://localhost/ || true)
+            [ "$code" = "200" ] && break
+            echo "waiting for ingress (attempt $i, got $code)"
+            sleep 5
+          done
+          test "$(curl -s -o /dev/null -w '%{http_code}' -H "$H" http://localhost/)" = "200"
+          test "$(curl -s -o /dev/null -w '%{http_code}' -H "$H" http://localhost/api/stats)" = "200"
+          code=$(curl -s -o /tmp/c.json -w '%{http_code}' -X POST -H "$H" \
+            -H 'content-type: application/json' \
+            -d '{"text":"CD smoke: deployment health check complaint","location":"CD Street"}' \
+            http://localhost/api/complaints)
+          echo "POST /api/complaints -> $code"
+          test "$code" = "201"
+          jq -e '.id and .triaged_by' /tmp/c.json
+          echo "ingress smoke OK"
+
+      - name: Cluster evidence
+        if: always()
+        run: |
+          kubectl -n civicpulse get deploy,sts,svc,ingress,hpa,pdb -o wide || true
+          kubectl get nodes -o wide || true
