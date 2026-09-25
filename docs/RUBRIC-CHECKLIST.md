@@ -55,12 +55,12 @@ One box per rubric line. Tick only when **evidence exists** (code, screenshot, l
 - [x] G6 compose.prod.yaml uses image: ${IMAGE_TAG}, no build:, no published DB or cache port — 1
 
 ## H · Kubernetes — 20
-- [ ] H1 namespace, Deployments, StatefulSet+PVC for Postgres, ClusterIP Services, Ingress routing / and /api — 5
-- [ ] H2 ConfigMap and Secret separated; committed manifests carry placeholders only — 2
-- [ ] H3 all three probes correct: liveness independent of DB, readiness dependent — 4
-- [ ] H4 resources.requests and limits set on every container — 2
-- [ ] H5 HPA v2 with tuned behavior + captured kubectl get hpa -w output + replicas-vs-load chart from real load test — 4
-- [ ] H6 VPA recommender mode, recommendations committed, requests updated in response, HPA/VPA conflict explained — 3
+- [x] H1 namespace, Deployments, StatefulSet+PVC for Postgres, ClusterIP Services, Ingress routing / and /api — 5
+- [x] H2 ConfigMap and Secret separated; committed manifests carry placeholders only — 2
+- [x] H3 all three probes correct: liveness independent of DB, readiness dependent — 4
+- [x] H4 resources.requests and limits set on every container — 2
+- [x] H5 HPA v2 with tuned behavior + captured kubectl get hpa -w output + replicas-vs-load chart from real load test — 4
+- [x] H6 VPA recommender mode, recommendations committed, requests updated in response, HPA/VPA conflict explained — 3
 
 ## I · CI/CD — 20
 - [x] I1 ci.yml lint+typecheck+tests on every PR, configured as required checks — 4

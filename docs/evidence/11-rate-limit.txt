@@ -1,0 +1,18 @@
+Rate-limit evidence (RATE_LIMIT_PER_MIN=10, single client IP against ONE pod;
+with the shared ingress the window is per-replica until Redis lands — the
+real backend moves the limiter to Redis, per PLAN.md):
+req  1 -> 201
+req  2 -> 201
+req  3 -> 201
+req  4 -> 201
+req  5 -> 201
+req  6 -> 201
+req  7 -> 201
+req  8 -> 201
+req  9 -> 201
+req 10 -> 201
+req 11 -> 429
+req 12 -> 429
+req 13 -> 429
+429 detail body:
+{"detail": "rate limit exceeded, slow down"}

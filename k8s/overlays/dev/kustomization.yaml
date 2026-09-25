@@ -4,6 +4,20 @@ kind: Kustomization
 resources:
   - ../../base
 
+# Dev-only: the 10/min per-client limit (base configmap, PDF spec) turns the
+# synthetic k6 load into a wall of 429s — one client IP behind Traefik, which
+# strips untrusted X-Forwarded-For. Prod and base keep 10/min; the limiter is
+# proven separately in docs/evidence/11-rate-limit.txt.
+patches:
+  - patch: |-
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: civicpulse-config
+        namespace: civicpulse
+      data:
+        RATE_LIMIT_PER_MIN: "1000000"
+
 # Dev runs against images imported into the local k3d cluster (tag: dev).
 images:
   - name: ghcr.io/alihaiderbajwa/civicpulse-backend

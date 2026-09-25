@@ -90,4 +90,24 @@ Regenerate the docx after every entry: `python3 scripts/build_docx.py`.
 
 **Next:** live red-blocks-merge demo for I7; P5 k3d bring-up + deploy of `k8s/overlays/dev` (pause courier containers first — ask user); then P6 `cd.yml`.
 
+## M5 — P5: Kubernetes stack live on k3d + autoscaling evidence (Ali + AI agent)
+
+**Expected:** `k8s/` base + overlays applied to a real cluster; three probes correct on every workload; resources everywhere; HPA v2 scaling on real load with `-w` capture and replicas-vs-load chart; VPA recommender recommendations applied to manifests.
+
+**Achieved:**
+- **k3d cluster `civicpulse`** (k3s v1.35.5, single node, host :8080→Traefik; host :80 was taken by system apache2 — never touched). Images imported via `ctr` (k3d's importer silently skipped an OCI-index image once — direct `docker save | ctr import` used).
+- **Deployed `k8s/overlays/dev`**: namespace, ConfigMap, Secret (placeholders only in git — verified `git grep gsk_` empty, `.env` ignored), backend/frontend Deployments (RollingUpdate maxUnavailable 0, 3 probes, requests+limits), postgres **StatefulSet + volumeClaimTemplates**, redis Deployment + PVC, 4 ClusterIP Services, Ingress (one host; `/`→frontend, `/api`→backend), HPA v2, VPA (Off), PDB. kubeconform 16/16 via CI.
+- **VPA installed** — upstream CRDs are still apiextensions/v1beta1; used `vpa-v1-crd-gen.yaml` from `kubernetes/autoscaler` tag `vertical-pod-autoscaler-1.7.1` (recommender only, no updater/admission). Recommendation: **cpu 93m / memory 250Mi** → applied to `k8s/base/backend.yaml` (requests 100m→93m, 128Mi→250Mi), recommender `RecommendationProvided=True`.
+- **Ingress smoke:** GET `/` 200, GET `/api/stats` 200, POST `/api/complaints` **201** (category `streetlights`), PATCH 409 body verified. (First 404 scare was my curl missing the `Host:` header.)
+- **Stub rewritten to the full contract** (was 501 on POST): POST w/ 400 validation + 429, GET list/by-id, PATCH w/ 409 on invalid transition, stats X-Cache, threaded server. Integration CI job now asserts POST→GET→PATCH 200→PATCH 409.
+- **Two load-test bugs found & fixed (kept as lessons):**
+  1. Early 429/404 returns didn't drain the request body → keep-alive connections poisoned → next request parsed body as request line → **400 storm (68% failure)**. Fix: always read body first. k6 rerun: **100% checks, 0.00% failed, 79 652 requests**.
+  2. Rate-limit keys collided behind Traefik (strips untrusted XFF): dev overlay raises `RATE_LIMIT_PER_MIN` to 1 000 000 for synthetic load only; **base/prod keep 10/min**, proven separately (10×201 then 429, `docs/evidence/11-rate-limit.txt`).
+- **HPA cycle on real load:** 2→6→10 replicas at CPU 446%/60% during k6 (peak 522 rps), hold, 10→2 after load, burst blip 2→3→2. Captured live `kubectl get hpa -w` stream and 5s-sampled CSVs; chart `docs/evidence/18-hpa-load-chart.png`.
+- Frontend crash-restarts diagnosed: DNS-at-startup race with Service creation during first apply — clean re-rollout = **0 restarts**.
+
+**Evidence:** `docs/evidence/11-rate-limit.txt`, `12-k8s-probes-resources.txt`, `13-vpa.txt`, `14-config-secret-separation.txt`, `15-hpa-watch.txt`, `16-hpa-collect.csv`, `17-k6-rps.csv`, `18-hpa-load-chart.png`; k6 logs 100% green.
+
+**Next:** commit M5 artifacts; P6 `cd.yml` (I4/I5/I6); save k3d bring-up as `scripts/k8s-up.sh`; then P7 docs/J-block (README, diagrams, screenshots) and watch for Ashar's backend PRs.
+
 <!-- New entries above this line. -->

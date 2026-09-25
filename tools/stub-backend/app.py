@@ -166,13 +166,17 @@ class StubHandler(BaseHTTPRequestHandler):
 
     # ----------------------------------------------------------------- POST
     def do_POST(self) -> None:  # noqa: N802
+        # Always consume the body FIRST: an early return with a keep-alive
+        # connection would leave the body unread and the next request on that
+        # connection would parse it as the request line (observed as a storm
+        # of 400s during the k6 load test).
+        body = self._read_body()
         url = urlparse(self.path)
         if url.path != "/api/complaints":
             return self._json(404, {"detail": "not found"})
         if _rate_limited(self._client()):
             return self._json(429, {"detail": "rate limit exceeded, slow down"})
 
-        body = self._read_body()
         if body is None:
             return self._json(400, {"detail": "request body must be a JSON object"})
 
@@ -208,13 +212,13 @@ class StubHandler(BaseHTTPRequestHandler):
 
     # ---------------------------------------------------------------- PATCH
     def do_PATCH(self) -> None:  # noqa: N802
+        body = self._read_body()  # drain before any early return (keep-alive)
         m = re.fullmatch(r"/api/complaints/([0-9a-f-]+)/status", urlparse(self.path).path)
         if not m:
             return self._json(404, {"detail": "not found"})
         if _rate_limited(self._client()):
             return self._json(429, {"detail": "rate limit exceeded, slow down"})
 
-        body = self._read_body()
         if body is None:
             return self._json(400, {"detail": "request body must be a JSON object"})
         new_status = body.get("status")

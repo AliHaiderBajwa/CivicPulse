@@ -18,7 +18,7 @@ remain responsible for every line.
 | M2 frontend | React/Vite/TS app, typed client, 15 Vitest tests, Dockerfile, nginx.conf | Ali (and a second independent agent pass) ran tsc/eslint/vitest/build gates |
 | M3 compose | Two-network compose stack, volumes, healthchecks, segmentation proof | Ali ran the stack and inspected the `ping database` evidence |
 | M4 CI | `.github/workflows/ci.yml` (7 jobs), red→green fixes, required checks | Ali watched every run; fix commits reviewed before push |
-| M5 k8s | `k8s/` base + overlays manifests | Validated with kubeconform (16/16); Ali reviewed probe/resource rationale |
+| M5 k8s | `k8s/` base + overlays, VPA recommender install, k3d bring-up, stub contract completion, k6 load scripts + HPA/VPA evidence | kubeconform 16/16 in CI; probes/resources dumped from the live cluster; chart inspected before commit; two load-test bugs diagnosed from raw k6 JSON |
 
 ## Rules the AI agent worked under
 

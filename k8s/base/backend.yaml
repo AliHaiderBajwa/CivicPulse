@@ -99,9 +99,12 @@ spec:
               exec:
                 command: ["sleep", "5"] # leave Service endpoints before draining
           resources:
+            # Requests set from the VPA recommender's first real-data
+            # recommendation (updateMode: Off — human-applied, see vpa.yaml):
+            # target cpu=93m, memory=250Mi. Evidence in docs/evidence/13-vpa.txt.
             requests:
-              cpu: 100m        # HPA computes usage / request — no request, no HPA
-              memory: 128Mi
+              cpu: 93m         # HPA computes usage / request — no request, no HPA
+              memory: 250Mi
             limits:
               cpu: "1"
-              memory: 512Mi
+              memory: 1Gi
