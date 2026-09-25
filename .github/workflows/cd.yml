@@ -249,17 +249,27 @@ jobs:
           # Guard the -8 "deploying :latest" deduction at the point of truth: the
           # rendered manifest is the thing kubectl is about to apply, so assert on
           # it rather than trusting the sed above.
+          #
+          # Scope matters: the manifest also carries third-party base images
+          # (postgres:16-alpine, redis:7-alpine) which are correctly pinned by
+          # upstream tag and have no business carrying our commit SHA. Only the
+          # images we publish are held to the deploy-by-SHA rule.
           if grep -E '^\s+image:' /tmp/manifest.yaml | grep -q ':latest'; then
             echo "::error::rendered manifest pins :latest -- refusing to deploy"
             grep -E '^\s+image:' /tmp/manifest.yaml
             exit 1
           fi
-          if grep -E '^\s+image:' /tmp/manifest.yaml | grep -vq ":${SHA}$"; then
-            echo "::error::rendered manifest does not pin the commit SHA ${SHA}"
+          if ! grep -E '^\s+image:' /tmp/manifest.yaml | grep "${IMAGE_BASE}" | grep -q ":${SHA}$"; then
+            echo "::error::no ${IMAGE_BASE} image is pinned to the commit SHA ${SHA}"
             grep -E '^\s+image:' /tmp/manifest.yaml
             exit 1
           fi
-          echo "deploy-by-SHA assertion passed: every image is pinned to ${SHA}"
+          if grep -E '^\s+image:' /tmp/manifest.yaml | grep "${IMAGE_BASE}" | grep -qv ":${SHA}$"; then
+            echo "::error::an ${IMAGE_BASE} image is not pinned to ${SHA} -- refusing to deploy"
+            grep -E '^\s+image:' /tmp/manifest.yaml | grep "${IMAGE_BASE}"
+            exit 1
+          fi
+          echo "deploy-by-SHA assertion passed: every ${IMAGE_BASE} image is pinned to ${SHA}"
           kubectl apply -f /tmp/manifest.yaml
           # Base carries no ingressClassName (each environment's default
           # controller serves it); name the kind controller explicitly.
