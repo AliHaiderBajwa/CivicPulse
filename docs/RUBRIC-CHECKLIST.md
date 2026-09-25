@@ -10,10 +10,10 @@ One box per rubric line. Tick only when **evidence exists** (code, screenshot, l
 - [ ] A5 one deliberate merge conflict on real code, resolved, with markers/resolution/merge evidence + 2–4 sentences on why that version won — 3
 
 ## B · Frontend — 18
-- [ ] B1 Submit view: validation, honest loading state, renders category, priority, AI summary and provider — 5
-- [ ] B2 Dashboard: pagination, filters, status transitions, server's 409 message verbatim — 5
-- [ ] B3 Stats view rendering aggregates and cache-hit state from X-Cache — 3
-- [ ] B4 runtime config — no baked-in API URL; one image runs in any environment — 3
+- [x] B1 Submit view: validation, honest loading state, renders category, priority, AI summary and provider — 5
+- [x] B2 Dashboard: pagination, filters, status transitions, server's 409 message verbatim — 5
+- [x] B3 Stats view rendering aggregates and cache-hit state from X-Cache — 3
+- [x] B4 runtime config — no baked-in API URL; one image runs in any environment — 3
 - [ ] B5 ≥5 meaningful component tests passing in CI — 2
 
 ## C · Backend — 25
@@ -49,10 +49,10 @@ One box per rubric line. Tick only when **evidence exists** (code, screenshot, l
 ## G · Docker and Compose — 15
 - [ ] G1 both images multi-stage, pinned base, non-root USER, exec-form CMD, cache-correct layer order — 4
 - [ ] G2 .dockerignore per build context, before/after context sizes reported — 2
-- [ ] G3 two networks with internal: true; frontend provably cannot reach database — 4
-- [ ] G4 three named volumes, each justified; dev bind mount present and absent from prod — 2
-- [ ] G5 healthchecks on all services with depends_on: condition: service_healthy — 2
-- [ ] G6 compose.prod.yaml uses image: ${IMAGE_TAG}, no build:, no published DB or cache port — 1
+- [x] G3 two networks with internal: true; frontend provably cannot reach database — 4
+- [x] G4 three named volumes, each justified; dev bind mount present and absent from prod — 2
+- [x] G5 healthchecks on all services with depends_on: condition: service_healthy — 2
+- [x] G6 compose.prod.yaml uses image: ${IMAGE_TAG}, no build:, no published DB or cache port — 1
 
 ## H · Kubernetes — 20
 - [ ] H1 namespace, Deployments, StatefulSet+PVC for Postgres, ClusterIP Services, Ingress routing / and /api — 5

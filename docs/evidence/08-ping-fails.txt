@@ -1,0 +1,13 @@
+# Network segmentation proof — docker compose exec frontend (rubric G3)
+# Captured: 2026-09-25T15:50:02Z · stack: compose.yaml + compose.stub.yaml, all healthy
+
+$ docker compose exec frontend ping -c 2 database
+ping: bad address 'database'
+
+$ docker compose exec frontend ping -c 1 cache
+ping: bad address 'cache'
+
+$ docker compose exec frontend wget -qO- http://backend:8000/health   # edge path works
+{"status": "ok"}
+# frontend is on 'edge' only; database/cache are on 'internal' (internal: true).
+# bad address = Docker DNS has no route/name for the internal network from the frontend.
