@@ -34,9 +34,24 @@ each). Nothing in your scope has been started, by Ali or by the agent.
 | Local cluster | `scripts/k8s-up.sh` brings the whole stack up reproducibly | `scripts/k8s-up.sh` |
 | Docs/evidence | Rubric checklist with your boxes still open, PROGRESS log, AI disclosure | `docs/RUBRIC-CHECKLIST.md`, `PROGRESS.md` |
 
-Your code slots straight in: drop a real `backend/` directory in and both the CI
-`test-backend` job and the CD `build` job switch from the stub to your image
-automatically. No change needed from Ali.
+Your code slots straight in, but be precise about how, because the mechanism is
+not uniform:
+
+- **CI `test-backend`** activates by itself the moment `backend/pyproject.toml`
+  exists (it is gated on `hashFiles`). It runs `pytest --cov=app --cov-fail-under=65`
+  with `TRIAGE_PROVIDER=simulated`.
+- **CD `build`/`publish`** pick the build context the same way
+  (`backend/Dockerfile` if it exists, else `tools/stub-backend`).
+- **Compose does NOT switch automatically.** `compose.yaml` hardcodes
+  `build: context: ./backend`, so `docker compose up` fails until your directory
+  exists. That is why the README quickstart currently tells people to run
+  `docker compose -f compose.stub.yaml up -d --wait`. **When you land #1, Ali
+  flips the README back to the plain one-command form** — do not edit the README
+  yourself, just say so in the PR and he will.
+- **CI `integration`** is likewise gated on `backend/pyproject.toml` and will
+  start running the real compose stack. One thing Ali still owes you there: the
+  `X-Cache: MISS → HIT` assertion, which only makes sense once your Redis cache
+  exists. He will add it when your #6 lands.
 
 ## 2. Your issues, in dependency order
 

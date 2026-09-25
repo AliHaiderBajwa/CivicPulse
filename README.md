@@ -9,8 +9,18 @@ A citizen submits a complaint; the system validates it, triages it with an LLM (
 ```bash
 git clone https://github.com/AliHaiderBajwa/CivicPulse.git && cd CivicPulse
 cp .env.example .env        # add your LLM_API_KEY for live triage
-docker compose up -d --wait # seeded system on http://localhost:8080
+
+# The real backend is being built in `backend/` (see docs/ASHAR-HANDOFF.md).
+# Until it lands, the contract stub serves the identical API on the same port:
+docker compose -f compose.stub.yaml up -d --wait   # -> http://localhost:8080
+
+# Once `backend/` exists this is the only command you need — same file, no flags:
+docker compose up -d --wait
 ```
+
+Kubernetes, meanwhile, needs no backend at all: `scripts/k8s-up.sh` brings up the
+whole stack (including the CRDs, the VPA recommender and the autoscaler) and
+smoke-tests the Ingress.
 
 ```bash
 ./scripts/k8s-up.sh         # second command: the whole system on a local k3d cluster
