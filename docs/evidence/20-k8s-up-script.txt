@@ -1,0 +1,114 @@
+Reproducible local bring-up — scripts/k8s-up.sh (no manual steps)
+captured: 2026-09-25T18:13:08Z on Linux 7.0.0-31-generic
+command: scripts/k8s-up.sh  (cluster already existed -> idempotent re-apply)
+
+
+[1m==> Reusing existing cluster civicpulse (delete it with --recreate)[0m
+
+[1m==> Building application images tagged :dev[0m
+
+[1m==> Pulling and importing 5 images into the node[0m
+    ok (k3d importer): postgres:16-alpine
+    ok (k3d importer): redis:7-alpine
+    ok (k3d importer): ghcr.io/alihaiderbajwa/civicpulse-backend:dev
+    ok (k3d importer): ghcr.io/alihaiderbajwa/civicpulse-frontend:dev
+    ok (k3d importer): registry.k8s.io/autoscaling/vpa-recommender:1.7.1
+
+[1m==> Installing CRDs, then the VPA recommender[0m
+customresourcedefinition.apiextensions.k8s.io/verticalpodautoscalercheckpoints.autoscaling.k8s.io unchanged
+customresourcedefinition.apiextensions.k8s.io/verticalpodautoscalers.autoscaling.k8s.io unchanged
+customresourcedefinition.apiextensions.k8s.io/verticalpodautoscalers.autoscaling.k8s.io condition met
+serviceaccount/vpa-admission-controller unchanged
+serviceaccount/vpa-recommender unchanged
+serviceaccount/vpa-updater unchanged
+role.rbac.authorization.k8s.io/system:leader-locking-vpa-recommender unchanged
+role.rbac.authorization.k8s.io/system:leader-locking-vpa-updater unchanged
+clusterrole.rbac.authorization.k8s.io/system:evictioner unchanged
+clusterrole.rbac.authorization.k8s.io/system:metrics-reader unchanged
+clusterrole.rbac.authorization.k8s.io/system:vpa-actor unchanged
+clusterrole.rbac.authorization.k8s.io/system:vpa-admission-controller unchanged
+clusterrole.rbac.authorization.k8s.io/system:vpa-checkpoint-actor unchanged
+clusterrole.rbac.authorization.k8s.io/system:vpa-status-actor unchanged
+clusterrole.rbac.authorization.k8s.io/system:vpa-status-reader unchanged
+clusterrole.rbac.authorization.k8s.io/system:vpa-target-reader unchanged
+clusterrole.rbac.authorization.k8s.io/system:vpa-updater-in-place unchanged
+rolebinding.rbac.authorization.k8s.io/system:leader-locking-vpa-recommender unchanged
+rolebinding.rbac.authorization.k8s.io/system:leader-locking-vpa-updater unchanged
+clusterrolebinding.rbac.authorization.k8s.io/system:metrics-reader unchanged
+clusterrolebinding.rbac.authorization.k8s.io/system:vpa-actor unchanged
+clusterrolebinding.rbac.authorization.k8s.io/system:vpa-admission-controller unchanged
+clusterrolebinding.rbac.authorization.k8s.io/system:vpa-checkpoint-actor unchanged
+clusterrolebinding.rbac.authorization.k8s.io/system:vpa-evictioner-binding unchanged
+clusterrolebinding.rbac.authorization.k8s.io/system:vpa-status-actor unchanged
+clusterrolebinding.rbac.authorization.k8s.io/system:vpa-status-reader-binding unchanged
+clusterrolebinding.rbac.authorization.k8s.io/system:vpa-target-reader-binding unchanged
+clusterrolebinding.rbac.authorization.k8s.io/system:vpa-updater-in-place-binding unchanged
+deployment.apps/vpa-recommender unchanged
+deployment "vpa-recommender" successfully rolled out
+
+[1m==> Deploying k8s/overlays/dev at tag :dev[0m
+namespace/civicpulse unchanged
+configmap/civicpulse-config unchanged
+Warning: resource secrets/civicpulse-secrets is missing the kubectl.kubernetes.io/last-applied-configuration annotation which is required by kubectl apply. kubectl apply should only be used on resources created declaratively by either kubectl create --save-config or kubectl apply. The missing annotation will be patched automatically.
+secret/civicpulse-secrets configured
+service/backend unchanged
+service/cache unchanged
+service/database unchanged
+service/frontend unchanged
+persistentvolumeclaim/redis-data unchanged
+deployment.apps/backend unchanged
+deployment.apps/frontend unchanged
+deployment.apps/redis unchanged
+statefulset.apps/postgres configured
+poddisruptionbudget.policy/backend configured
+verticalpodautoscaler.autoscaling.k8s.io/backend-vpa unchanged
+horizontalpodautoscaler.autoscaling/backend unchanged
+ingress.networking.k8s.io/civicpulse unchanged
+secret/civicpulse-secrets replaced
+
+[1m==> Waiting for rollouts[0m
+deployment "backend" successfully rolled out
+deployment "frontend" successfully rolled out
+partitioned roll out complete: 1 new pods have been updated...
+deployment "redis" successfully rolled out
+
+[1m==> Smoke-testing the Ingress on http://localhost:8080[0m
+    GET /            200
+    GET /api/stats   200
+    POST /api/complaints 201  -> triaged_by=rules
+
+[1m==> Cluster state[0m
+NAME                       READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/backend    2/2     2            2           90m
+deployment.apps/frontend   2/2     2            2           90m
+deployment.apps/redis      1/1     1            1           90m
+
+NAME                        READY   AGE
+statefulset.apps/postgres   1/1     90m
+
+NAME               TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE
+service/backend    ClusterIP   10.43.2.87      <none>        8000/TCP   90m
+service/cache      ClusterIP   10.43.196.211   <none>        6379/TCP   90m
+service/database   ClusterIP   10.43.65.182    <none>        5432/TCP   90m
+service/frontend   ClusterIP   10.43.229.114   <none>        8080/TCP   90m
+
+NAME                                   CLASS    HOSTS                  ADDRESS      PORTS   AGE
+ingress.networking.k8s.io/civicpulse   <none>   civicpulse.localhost   172.22.0.2   80      90m
+
+NAME                                          REFERENCE            TARGETS       MINPODS   MAXPODS   REPLICAS   AGE
+horizontalpodautoscaler.autoscaling/backend   Deployment/backend   cpu: 1%/60%   2         10        2          90m
+
+NAME                                 MIN AVAILABLE   MAX UNAVAILABLE   ALLOWED DISRUPTIONS   AGE
+poddisruptionbudget.policy/backend   1               N/A               1                     90m
+
+VPA recommendation (recommender observes, it never changes limits itself):
+backend-vpa: {"cpu":"78m","memory":"250Mi"}
+
+CivicPulse is up.
+  frontend   http://localhost:8080/          (send Host: civicpulse.localhost)
+  api        http://localhost:8080/api/stats
+  dashboard  kubectl -n civicpulse get all
+  logs       kubectl -n civicpulse logs deploy/backend -f
+  tear down  k3d cluster delete civicpulse
+
+EXIT=0
