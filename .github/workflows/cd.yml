@@ -97,6 +97,8 @@ jobs:
             docker manifest inspect "$ref" >/dev/null
             echo "published: $ref"
           done
+        env:
+          IMAGE_BASE: ${{ needs.build.outputs.image_base }}
 
   deploy-k8s:
     needs: publish # gated: deploy only after the SHA images are published
