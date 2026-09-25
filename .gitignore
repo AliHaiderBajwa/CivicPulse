@@ -28,3 +28,6 @@ kubeconfig
 .DS_Store
 .idea/
 .vscode/
+
+# office lock files
+.~lock.*#
