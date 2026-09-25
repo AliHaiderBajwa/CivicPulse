@@ -1,0 +1,248 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "CivicPulse API",
+    "version": "1.0.0",
+    "description": "Municipal complaint intake, triage and operations API. Contract source: assignment PDF §2.2 — both partners code against this file."
+  },
+  "servers": [
+    { "url": "/api", "description": "Relative — frontend proxies /api (ADR 0002)" }
+  ],
+  "components": {
+    "schemas": {
+      "Category": {
+        "type": "string",
+        "enum": ["water", "electricity", "sanitation", "roads", "streetlights", "other"]
+      },
+      "Priority": { "type": "string", "enum": ["high", "normal", "low"] },
+      "Status": { "type": "string", "enum": ["open", "in_progress", "resolved", "rejected"] },
+      "ComplaintCreate": {
+        "type": "object",
+        "required": ["text", "location"],
+        "properties": {
+          "text": { "type": "string", "minLength": 10, "maxLength": 2000, "description": "Free-text complaint" },
+          "location": { "type": "string", "minLength": 3, "maxLength": 200 },
+          "reporter_contact": { "type": ["string", "null"], "maxLength": 200, "description": "Optional email or phone" }
+        }
+      },
+      "Complaint": {
+        "type": "object",
+        "required": ["id", "text", "location", "category", "priority", "status", "triaged_by", "triage_latency_ms", "created_at", "updated_at"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "text": { "type": "string" },
+          "location": { "type": "string" },
+          "reporter_contact": { "type": ["string", "null"] },
+          "category": { "$ref": "#/components/schemas/Category" },
+          "priority": { "$ref": "#/components/schemas/Priority" },
+          "status": { "$ref": "#/components/schemas/Status" },
+          "ai_summary": { "type": ["string", "null"], "maxLength": 140 },
+          "triaged_by": {
+            "type": "string",
+            "enum": ["llm:groq", "llm:ollama", "rules", "rules:fallback"],
+            "description": "Which provider decided this triage"
+          },
+          "triage_latency_ms": { "type": "integer", "minimum": 0 },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "ComplaintPage": {
+        "type": "object",
+        "required": ["items", "total", "page", "page_size"],
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/Complaint" } },
+          "total": { "type": "integer" },
+          "page": { "type": "integer" },
+          "page_size": { "type": "integer" }
+        }
+      },
+      "StatusUpdate": {
+        "type": "object",
+        "required": ["status"],
+        "properties": { "status": { "$ref": "#/components/schemas/Status" } }
+      },
+      "Stats": {
+        "type": "object",
+        "required": ["total", "by_category", "by_priority"],
+        "properties": {
+          "total": { "type": "integer" },
+          "by_category": {
+            "type": "object",
+            "additionalProperties": { "type": "integer" }
+          },
+          "by_priority": {
+            "type": "object",
+            "additionalProperties": { "type": "integer" }
+          }
+        }
+      },
+      "TriageOutcome": {
+        "type": "object",
+        "required": ["provider", "latency_ms", "fallback"],
+        "properties": {
+          "provider": { "type": "string" },
+          "latency_ms": { "type": "integer" },
+          "fallback": { "type": "boolean" },
+          "complaint_id": { "type": ["string", "null"], "format": "uuid" }
+        }
+      },
+      "ProviderMeta": {
+        "type": "object",
+        "required": ["active_provider", "recent_triages"],
+        "properties": {
+          "active_provider": { "type": "string" },
+          "recent_triages": {
+            "type": "array",
+            "maxItems": 20,
+            "items": { "$ref": "#/components/schemas/TriageOutcome" }
+          }
+        }
+      },
+      "ValidationError": {
+        "type": "object",
+        "required": ["detail"],
+        "properties": {
+          "detail": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["field", "message"],
+              "properties": {
+                "field": { "type": "string" },
+                "message": { "type": "string" }
+              }
+            }
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": ["detail"],
+        "properties": { "detail": { "type": "string" } }
+      },
+      "Ready": {
+        "type": "object",
+        "required": ["status", "dependencies"],
+        "properties": {
+          "status": { "type": "string", "enum": ["ok", "degraded"] },
+          "dependencies": {
+            "type": "object",
+            "properties": {
+              "postgres": { "type": "boolean" },
+              "redis": { "type": "boolean" }
+            }
+          }
+        }
+      }
+    },
+    "parameters": {
+      "category": { "name": "category", "in": "query", "schema": { "$ref": "#/components/schemas/Category" } },
+      "priority": { "name": "priority", "in": "query", "schema": { "$ref": "#/components/schemas/Priority" } },
+      "status": { "name": "status", "in": "query", "schema": { "$ref": "#/components/schemas/Status" } },
+      "page": { "name": "page", "in": "query", "schema": { "type": "integer", "minimum": 1, "default": 1 } },
+      "page_size": { "name": "page_size", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 } },
+      "id": { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+    },
+    "responses": {
+      "FieldErrors": {
+        "description": "Field-level validation failure",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ValidationError" } } }
+      },
+      "RateLimited": {
+        "description": "Rate limit exceeded — see Retry-After header",
+        "headers": { "Retry-After": { "schema": { "type": "integer" }, "description": "Seconds to wait" } },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "NotFound": {
+        "description": "Resource not found",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "Conflict": {
+        "description": "Invalid status transition — detail names the attempted transition",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      }
+    }
+  },
+  "paths": {
+    "/complaints": {
+      "post": {
+        "operationId": "createComplaint",
+        "summary": "Validate, triage, persist",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ComplaintCreate" } } }
+        },
+        "responses": {
+          "201": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Complaint" } } } },
+          "400": { "$ref": "#/components/responses/FieldErrors" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      },
+      "get": {
+        "operationId": "listComplaints",
+        "summary": "Filter and paginate",
+        "parameters": [
+          { "$ref": "#/components/parameters/category" },
+          { "$ref": "#/components/parameters/priority" },
+          { "$ref": "#/components/parameters/status" },
+          { "$ref": "#/components/parameters/page" },
+          { "$ref": "#/components/parameters/page_size" }
+        ],
+        "responses": {
+          "200": { "description": "Page of complaints", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ComplaintPage" } } } },
+          "400": { "$ref": "#/components/responses/FieldErrors" }
+        }
+      }
+    },
+    "/complaints/{id}": {
+      "get": {
+        "operationId": "getComplaint",
+        "parameters": [{ "$ref": "#/components/parameters/id" }],
+        "responses": {
+          "200": { "description": "Found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Complaint" } } } },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/complaints/{id}/status": {
+      "patch": {
+        "operationId": "updateComplaintStatus",
+        "summary": "Advance status through the state machine",
+        "parameters": [{ "$ref": "#/components/parameters/id" }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/StatusUpdate" } } }
+        },
+        "responses": {
+          "200": { "description": "Updated", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Complaint" } } } },
+          "400": { "$ref": "#/components/responses/FieldErrors" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/stats": {
+      "get": {
+        "operationId": "getStats",
+        "summary": "Aggregates by category and priority",
+        "parameters": [
+          { "name": "X-Cache", "in": "header", "schema": { "type": "string", "enum": ["HIT", "MISS"] }, "description": "Response header: cache state (always present)" }
+        ],
+        "responses": {
+          "200": { "description": "Aggregates", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Stats" } } } }
+        }
+      }
+    },
+    "/meta/providers": {
+      "get": {
+        "operationId": "getProviderMeta",
+        "summary": "Active triage provider and last 20 outcomes",
+        "responses": {
+          "200": { "description": "Observability surface", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProviderMeta" } } } }
+        }
+      }
+    }
+  },
+  "externalDocs": { "description": "Health/readiness/metrics live outside /api: /health, /ready, /metrics", "url": "https://github.com/AliHaiderBajwa/CivicPulse" }
+}
