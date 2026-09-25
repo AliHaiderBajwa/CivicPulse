@@ -151,7 +151,7 @@ jobs:
           cache-from: type=gha,scope=frontend
 
       - name: Trivy scan — frontend
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: civicpulse-frontend:ci
           severity: HIGH,CRITICAL
@@ -170,7 +170,7 @@ jobs:
 
       - name: Trivy scan — backend
         if: ${{ hashFiles('backend/Dockerfile') != '' }}
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: civicpulse-backend:ci
           severity: HIGH,CRITICAL
@@ -193,7 +193,8 @@ jobs:
 
       - name: Manifests not present yet
         if: ${{ hashFiles('k8s/overlays/prod/kustomization.yaml') == '' }}
-        run: echo "::notice::k8s/ overlay missing — manifests job activates when Kubernetes manifests land (Issue #11)"
+        run: |
+          echo "::notice::k8s overlay missing - manifests job activates when Kubernetes manifests land (Issue 11)"
 
   integration:
     runs-on: ubuntu-latest
