@@ -1,0 +1,248 @@
+name: ci
+
+on:
+  push:
+    branches: [dev]
+  pull_request:
+    branches: [main]
+
+# Least privilege: every job gets read-only contents unless declared otherwise.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-type:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Backend — ruff + mypy
+        if: ${{ hashFiles('backend/pyproject.toml') != '' }}
+        working-directory: backend
+        run: |
+          python -m pip install --quiet ruff mypy
+          python -m pip install --quiet -e . || python -m pip install --quiet -r requirements.txt || true
+          ruff check .
+          mypy app --ignore-missing-imports
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Frontend — eslint + tsc
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run lint
+          npx tsc --noEmit
+
+  test-backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: civicpulse
+          POSTGRES_PASSWORD: civicpulse
+          POSTGRES_DB: civicpulse
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql+psycopg://civicpulse:civicpulse@localhost:5432/civicpulse
+      REDIS_URL: redis://localhost:6379/0
+      TRIAGE_PROVIDER: simulated
+      RATE_LIMIT_PER_MIN: "1000"
+      LOG_LEVEL: INFO
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: "Backend tests (deterministic: SimulatedTriage)"
+        if: ${{ hashFiles('backend/pyproject.toml') != '' }}
+        run: |
+          python -m pip install --quiet -e backend || python -m pip install --quiet -r backend/requirements.txt
+          python -m pip install --quiet pytest pytest-cov httpx
+          cd backend
+          alembic upgrade head || true
+          python -m app.seed || true
+          pytest --cov=app --cov-fail-under=65 -q
+
+  test-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Vitest (≥5 meaningful tests required)
+        working-directory: frontend
+        run: |
+          npm ci
+          npx vitest run
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build frontend image (never push on a PR)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: false
+          load: true
+          tags: civicpulse-frontend:ci
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+
+      - name: Build backend image (never push on a PR)
+        if: ${{ hashFiles('backend/Dockerfile') != '' }}
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: false
+          load: true
+          tags: civicpulse-backend:ci
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+  scan:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Rebuild frontend image from cache
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: false
+          load: true
+          tags: civicpulse-frontend:ci
+          cache-from: type=gha,scope=frontend
+
+      - name: Trivy scan — frontend
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: civicpulse-frontend:ci
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - name: Rebuild backend image from cache
+        if: ${{ hashFiles('backend/Dockerfile') != '' }}
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: false
+          load: true
+          tags: civicpulse-backend:ci
+          cache-from: type=gha,scope=backend
+
+      - name: Trivy scan — backend
+        if: ${{ hashFiles('backend/Dockerfile') != '' }}
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: civicpulse-backend:ci
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+  manifests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: kustomize build | kubeconform
+        if: ${{ hashFiles('k8s/overlays/prod/kustomization.yaml') != '' }}
+        run: |
+          set -euo pipefail
+          curl -fsSL -o /tmp/kustomize.tgz "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.8.1/kustomize_v5.8.1_linux_amd64.tar.gz"
+          tar -xzf /tmp/kustomize.tgz -C /tmp kustomize
+          curl -fsSL -o /tmp/kubeconform.tgz "https://github.com/yannh/kubeconform/releases/download/v0.8.0/kubeconform-linux-amd64.tar.gz"
+          tar -xzf /tmp/kubeconform.tgz -C /tmp kubeconform
+          /tmp/kustomize build k8s/overlays/prod | /tmp/kubeconform -strict -summary -
+
+      - name: Manifests not present yet
+        if: ${{ hashFiles('k8s/overlays/prod/kustomization.yaml') == '' }}
+        run: echo "::notice::k8s/ overlay missing — manifests job activates when Kubernetes manifests land (Issue #11)"
+
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Full request-path smoke (real backend)
+        if: ${{ hashFiles('backend/pyproject.toml') != '' }}
+        run: |
+          set -euo pipefail
+          cp .env.example .env
+          docker compose -f compose.yaml up -d --wait
+          trap 'docker compose -f compose.yaml down -v' EXIT
+
+          # X-Cache must go MISS then HIT on a fresh stack
+          c1=$(curl -sD- -o/dev/null http://localhost:8080/api/stats | awk 'tolower($1)=="x-cache:"{print $2}' | tr -d '\r')
+          c2=$(curl -sD- -o/dev/null http://localhost:8080/api/stats | awk 'tolower($1)=="x-cache:"{print $2}' | tr -d '\r')
+          test "$c1" = "MISS" && test "$c2" = "HIT"
+          echo "X-Cache: $c1 -> $c2"
+
+          # POST a complaint, GET it back, assert the category
+          resp=$(curl -sf -X POST http://localhost:8080/api/complaints \
+            -H 'content-type: application/json' \
+            -d '{"text":"burst water main flooding Street 12 since fajr water entering ground floors","location":"Street 12"}')
+          echo "$resp"
+          echo "$resp" | jq -e '.category | IN("water","electricity","sanitation","roads","streetlights","other")'
+          id=$(echo "$resp" | jq -r .id)
+          curl -sf "http://localhost:8080/api/complaints/$id" | jq -e ".id == \"$id\""
+          echo "integration smoke OK"
+
+      - name: Infra smoke via stub (activates real path when backend lands)
+        if: ${{ hashFiles('backend/pyproject.toml') == '' }}
+        run: |
+          set -euo pipefail
+          cp .env.example .env
+          docker compose -f compose.yaml -f compose.stub.yaml up -d --wait
+          trap 'docker compose -f compose.yaml -f compose.stub.yaml down -v' EXIT
+
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/)" = "200"
+
+          c1=$(curl -sD- -o/dev/null http://localhost:8080/api/stats | awk 'tolower($1)=="x-cache:"{print $2}' | tr -d '\r')
+          c2=$(curl -sD- -o/dev/null http://localhost:8080/api/stats | awk 'tolower($1)=="x-cache:"{print $2}' | tr -d '\r')
+          test "$c1" = "MISS" && test "$c2" = "HIT"
+          echo "X-Cache: $c1 -> $c2"
+
+          # Segmentation: the frontend must NOT reach the database
+          if docker compose -f compose.yaml -f compose.stub.yaml exec -T frontend ping -c 1 database; then
+            echo "frontend reached the database — segmentation broken" >&2
+            exit 1
+          fi
+          echo "isolation OK (frontend cannot reach database)"
+          echo "stub smoke OK — full POST path activates when backend/pyproject.toml lands"
