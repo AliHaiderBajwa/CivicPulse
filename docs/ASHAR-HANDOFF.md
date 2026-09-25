@@ -5,9 +5,18 @@ without waiting for a call. Everything in this file is **yours**; nothing here
 has been implemented for you on purpose. The frontend, Compose, Kubernetes and
 CI/CD are Ali's and are done — you build on top of them.
 
-Read this, then work the issues in order. Ask Ali to add you as a collaborator
-first (he has to do it from the repo settings; he also needs to review your PRs
-so the pair-contribution marks count).
+You are `@ashar1x` and Ali has added you to the repo as a collaborator with push
+access, so you can branch and open PRs straight away. Ali's AI agent has also
+assigned your issues to you (visible as assignee on each). Read this, then work
+them in order.
+
+**Current state (so you know exactly what you are starting from):** 24 commits,
+all Ali's; CI green on 7 required checks; CD green end to end
+(build → publish → deploy-k8s, run `36170624771`, deployed by commit SHA to an
+ephemeral kind cluster with a 201 through the Ingress); local k3d cluster up via
+`scripts/k8s-up.sh`; frontend, Compose, Kubernetes and CI/CD finished. Your code
+is the missing ~50% of the marks (brief §6 values the AI layer and backend at 25
+each). Nothing in your scope has been started, by Ali or by the agent.
 
 ---
 
@@ -39,6 +48,8 @@ automatically. No change needed from Ali.
 | 5 | Complaint API + state machine + request logging | The 409 behaviour the frontend already renders |
 | 6 | Redis stats cache + rate limiter | Last: pure optimisation on top of working endpoints |
 | 10 | Backend test suite | Write alongside, but land the suite as its own PRs |
+| 17 | Prometheus `/metrics` endpoint | The brief lists 9 endpoints; the frozen contract has 7. Add it when you re-export the schema |
+| 18 | `TRIAGE.md` + your ENGINEERING-NOTES answers | Write these as you land the code so the `file:line` refs stay true |
 
 ## 3. The rules that will cost marks if you break them
 
@@ -99,8 +110,35 @@ The stub is what the frontend is pointed at today. When your backend is ready,
   is distributed (Redis), returns 429 with `Retry-After`, and honours the PDF's
   10/minute per client in base and production.
 - **#10** — ≥14 deterministic tests, no network calls, coverage ≥65% on `app/`.
+- **#17 `/metrics`** — Prometheus text format exposing request count, latency
+  histogram, triage latency and a fallback counter that increments exactly when a
+  provider degrades to `rules:fallback`. Must not touch Postgres and must not be
+  rate limited. The committed `docs/openapi.json` has no `/metrics`, so add it
+  when you re-export the schema in #1 and regenerate `frontend/src/api/client.ts`.
+- **#18 docs** — `TRIAGE.md` (four providers, `TRIAGE_PROVIDER` selection, JSON
+  mode + Pydantic validation, 10s timeout, single jittered retry, content-hash
+  cache with **measured hit rate**, injection guardrail, the always-raise test
+  with its CI run link) plus your four ENGINEERING-NOTES answers with
+  `file:line` refs.
 
-## 6. How to structure the work so both of us get the pair marks
+## 6. Deliverables, and who signs each one
+
+From the brief §4. The right-hand column is who has to produce it.
+
+| Deliverable | Owner | State |
+|---|---|---|
+| README (problem, badges, Mermaid, one-command quickstart, API table, screenshots) | Ali | not started |
+| 4 ADRs (provider interface, frontend runtime config, deploy-by-SHA, PII/data governance) | Ali (the provider-interface one needs your input) | not started |
+| RUNBOOK (incl. `rollout undo` vs re-applying the previous SHA) | Ali | not started |
+| ENGINEERING-NOTES — 8 questions, `file:line` refs | **split**: Ali does frontend runtime config, deploy-by-SHA, K8s probes/autoscaling, CI security; **you do** provider interface, retry policy, cache TTL + invalidation, fallback guarantees | not started |
+| TRIAGE.md | **you** (issue #18) | not started |
+| AI-USAGE.md | Ali (honest, specific) | done, updated every milestone |
+| Demo video ≤5 min, **both partners speaking** | both of us — book it, do not leave it to the end | not started |
+| `docs/evidence/` screenshots and captures | Ali (done, 21 files) | done |
+| `scripts/check_submission.py` clean | Ali | not run yet |
+| Submission bundle: repo URL, green `cd.yml` run link, both GHCR images with SHA tags, video link, `git shortlog -sn`, HPA capture + chart | Ali | 5 of 6 ready — **only the video link and a meaningful `git shortlog` are outstanding, and both need you** |
+
+## 7. How to structure the work so both of us get the pair marks
 
 The rubric wants genuine two-person work, and the numbers are not decorative:
 
@@ -122,9 +160,13 @@ Suggested branch names: `feat/api-skeleton`, `feat/alembic-migration`,
 `feat/triage-providers`, `feat/state-machine`, `feat/redis-cache`,
 `test/backend-suite`.
 
-## 7. When you are blocked
+## 8. When you are blocked
 
-- Need collaborator access → ask Ali (he must invite you; I cannot).
+- Collaborator access: done — you are `@ashar1x` with push access.
+- Housekeeping: the persistence proof left a `persistence_probe` table in the dev
+  Postgres (`docs/evidence/21-postgres-persistence.txt`). Drop it before your
+  Alembic `0001` migration so your baseline is clean:
+  `kubectl -n civicpulse exec statefulset/postgres -- psql -U civicpulse -d civicpulse -c 'DROP TABLE persistence_probe'`
 - Contract is ambiguous or you need a field the contract does not have → open
   an issue and ping Ali **before** implementing, so the frontend typed client
   and the contract do not drift apart.
@@ -132,7 +174,7 @@ Suggested branch names: `feat/api-skeleton`, `feat/alembic-migration`,
   into the K8s ConfigMap (non-secret) or Secret (secret) plus `.env.example`,
   and the `k8s/` manifests are Ali's to review.
 
-## 8. What I deliberately did not do
+## 9. What I deliberately did not do
 
 The stub in `tools/stub-backend/` implements the whole contract in memory. It is
 scaffolding so the frontend, Compose, Kubernetes and CI could be built and

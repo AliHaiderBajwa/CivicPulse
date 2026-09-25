@@ -1,0 +1,36 @@
+Postgres persistence proof — brief §3: 'deleting the Postgres pod keeps rows'
+captured: 2026-09-25T18:27:39Z  cluster: k3d-civicpulse
+
+== 1. the data lives on the volume, not in the pod ==
+  volumeClaimTemplates: pgdata 
+NAME                STATUS   VOLUME                                     CLAIM
+pgdata-postgres-0   Bound    pvc-bff5492e-a3f5-4aa9-9833-3237da3e76da   <none>
+
+== 2. write a row that exists nowhere but the volume ==
+NOTICE:  relation "persistence_probe" already exists, skipping
+  pod: postgres-0 (uid 51430caf)
+  rows before: 2
+
+== 3. delete the pod outright, then wait for the StatefulSet to replace it ==
+pod "postgres-0" deleted from civicpulse namespace
+Waiting for 1 pods to be ready...
+Waiting for 1 pods to be ready...
+Waiting for 1 pods to be ready...
+partitioned roll out complete: 1 new pods have been updated...
+  new pod: postgres-0 (uid 934b4122)
+  -> different pod object: the old one is really gone
+
+== 4. the row is still there, served by the replacement pod ==
+  rows after:  2
+ id |            note             |              at               
+----+-----------------------------+-------------------------------
+  1 | written before pod deletion | 2026-09-25 18:27:23.490529+00
+  2 | written before pod deletion | 2026-09-25 18:27:40.37566+00
+(2 rows)
+
+
+RESULT: PASS — the pod was replaced (uid 51430caf -> 934b4122) and all 2 rows survived.
+The volumeClaimTemplates PVC owns the data, not the pod.
+
+== 5. compose equivalent ==
+  'docker compose down' then 'up' keeps rows via the named volume pgdata (docs/evidence/03-compose-persistence.txt)
