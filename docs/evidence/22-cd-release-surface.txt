@@ -1,0 +1,30 @@
+CD release-surface evidence — brief §3 I4/I5: SHA + latest alias, SBOM, digests
+captured: 2026-09-25T19:08:56Z  run: 36176361020  commit: cf02f1576139c49fd99624ae0cb55f4eaa0c35ff
+
+== job chain (all green) ==
+  test (gate): success
+  build: success
+  publish: success
+  deploy-k8s: success
+
+== registry: latest is an ALIAS of the SHA, not a separate build ==
+  frontend
+    ghcr.io/alihaiderbajwa/civicpulse-frontend:cf02f1576139c49fd99624ae0cb55f4eaa0c35ff
+      -> sha256:e52c13872612dfbfbc7d31a024fd5b7691063b25121d5b5b748df480d1b00e87
+    ghcr.io/alihaiderbajwa/civicpulse-frontend:latest
+      -> sha256:e52c13872612dfbfbc7d31a024fd5b7691063b25121d5b5b748df480d1b00e87
+    same digest: latest is an alias of the SHA, never a separate image
+  backend
+    ghcr.io/alihaiderbajwa/civicpulse-backend:cf02f1576139c49fd99624ae0cb55f4eaa0c35ff
+      -> sha256:57cf4b889837d3d2caae9accc6ce5a5d4f9391e424f4c66d006a49722baab785
+    ghcr.io/alihaiderbajwa/civicpulse-backend:latest
+      -> sha256:57cf4b889837d3d2caae9accc6ce5a5d4f9391e424f4c66d006a49722baab785
+    same digest: latest is an alias of the SHA, never a separate image
+
+== SBOM artifacts uploaded by the publish job (Syft, SPDX JSON) ==
+  sbom-backend-cf02f1576139c49fd99624ae0cb55f4eaa0c35ff.spdx.json  311377 bytes
+  sbom-frontend-cf02f1576139c49fd99624ae0cb55f4eaa0c35ff.spdx.json  119185 bytes
+
+NOTE: deploy-k8s applies the SHA-pinned images only. The pipeline now
+refuses to apply a rendered manifest containing :latest, so the alias
+cannot become a deployed tag by accident.

@@ -133,4 +133,66 @@ Regenerate the docx after every entry: `python3 scripts/build_docx.py`.
 
 **Next:** tick I4/I5/I6; save the k3d bring-up as `scripts/k8s-up.sh`; then P7/J-block (README, Mermaid diagrams, screenshots, runbook) and the AI layer, watching for Ashar's backend PRs.
 
+
+## M7 — release surface, deploy guard, and the handoff fix (2026-09-25)
+
+**Expected:** the brief's CI/CD shape satisfied — a `test` gate ahead of publish,
+`latest` published alongside the SHA, Syft SBOMs, recorded digests, a
+`release.yml` on `v*` tags, and the three missing §4 docs blocks still open.
+
+**Achieved:**
+- **Handoff correctness (the important one).** Re-reading `docs/ASHAR-HANDOFF.md`
+  against the brief found it claiming *"compose.yaml already prefers `backend/`
+  over `tools/stub-backend`"*. **It does not** — `compose.yaml` hardcodes
+  `build: context: ./backend`, so `docker compose up` fails until that directory
+  exists; `compose.stub.yaml` is the variant that runs today. A false promise to
+  a partner is worse than a missing feature, because he would have lost the first
+  hour of his first day. The handoff now describes the real mechanism per surface
+  (CI and CD switch on `hashFiles`; Compose does not switch at all), and the
+  README quickstart states which command works now and which becomes the only
+  command once `backend/` lands.
+- **Persistence proof (brief §3, previously missing).**
+  `docs/evidence/21-postgres-persistence.txt`: a row is written, the pod is
+  deleted outright (uid `51430caf` → `934b4122`), the StatefulSet replaces it, and
+  the rows are still there. The **first** capture of this matched no pods
+  (wrong selector), deleted nothing and "passed" vacuously; it was discarded
+  rather than filed as evidence, and the real run confirms a different pod uid.
+- **`cd.yml` reshaped to the brief:** `test` → `build` → `publish` → `deploy-k8s`,
+  every hop `needs:`-gated. The backend half of `test` is gated on
+  `hashFiles('backend/pyproject.toml')` so it skips cleanly until Ashar's
+  directory exists. `publish` now carries `:${github.sha}` **and** a `latest`
+  alias — the brief asks for both, and `AGENTS.md` forbids *deploying* `:latest`,
+  not publishing it, so the two rules are satisfied rather than traded off.
+- **Syft SBOMs** (SPDX JSON) for both images, and **digests** recorded to the run
+  summary. Verified in the registry: `latest` and the SHA resolve to the *same*
+  digest for both images, so the alias can never drift into a different build.
+- **Deploy-by-SHA guard.** `deploy-k8s` now reads the rendered manifest it is
+  about to apply and refuses to continue if it contains `:latest`, or if any
+  `${IMAGE_BASE}` image is not pinned to the commit SHA. The −8 deduction is
+  caught at the point `kubectl` is handed the file, instead of trusting a `sed`.
+- **`release.yml` (tag `v*`):** semver validation → publish semver + 2-part + SHA
+  tags → SBOMs → GitHub Release with notes and an image digest table. It
+  publishes but **never deploys**; a release means "this commit is a version".
+- **Two defects found by running it, both fixed:**
+  1. The first version of the guard demanded *every* image be pinned to our
+     commit SHA, which also rejected `postgres:16-alpine` and `redis:7-alpine` —
+     third-party images correctly pinned by upstream tag. Caught by run
+     `36175736931` going red, not by a green pipeline. The guard is now scoped to
+     our own images and was verified against the real overlay (passes) plus three
+     tampered variants (`:latest`, one image moved to `main`, `postgres:latest` —
+     all rejected).
+  2. The first semver regex rejected `v1.2.3-rc1` while the same file's
+     `prerelease:` flag assumed prereleases could exist, so **prereleases were
+     uncuttable**. Replaced with the full semver 2.0.0 grammar; checked against
+     12 cases.
+
+**Evidence:** run **`36176361020`** (test/build/publish/deploy all success),
+`docs/evidence/22-cd-release-surface.txt` (job chain, digest equality for the
+alias, SBOM artifact sizes), `docs/evidence/21-postgres-persistence.txt`.
+
+**Next:** ADRs, RUNBOOK, ENGINEERING-NOTES (Ali's four answers), then
+`scripts/check_submission.py`; on Ashar's first PR, add the `X-Cache MISS→HIT`
+assertion to the integration job, which only becomes meaningful once his Redis
+cache exists.
+
 <!-- New entries above this line. -->
