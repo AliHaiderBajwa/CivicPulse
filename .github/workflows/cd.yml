@@ -18,7 +18,41 @@ concurrency:
   cancel-in-progress: false # never kill a deploy mid-flight
 
 jobs:
+  # The brief specifies test -> build-push (needs: test). CI already runs the
+  # same suites on the push, but a CD pipeline that can publish an untested
+  # commit is not a gated pipeline, so the gate is repeated here explicitly.
+  test:
+    name: test (gate)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Backend suite (skipped until backend/ lands)
+        if: hashFiles('backend/pyproject.toml') != ''
+        run: |
+          set -euo pipefail
+          cd backend
+          pip install -e ".[dev]"
+          TRIAGE_PROVIDER=simulated pytest --cov=app --cov-fail-under=65 -q
+
+      - name: Frontend suite
+        run: |
+          set -euo pipefail
+          cd frontend
+          npm ci
+          npm test
+
   build:
+    needs: test # gated: never build an untested commit
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -73,20 +107,28 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Push frontend tagged by commit SHA
+      # The brief asks for GHCR to carry the commit SHA *and* `latest`. The
+      # AGENTS.md rule is about what we DEPLOY, not what we publish: `latest` is
+      # a convenience alias so humans and downstream users can pull by name, while
+      # deploy-k8s still rewrites the overlay to the SHA and nothing else.
+      - name: Push frontend (SHA + latest alias)
         uses: docker/build-push-action@v6
         with:
           context: ./frontend
           push: true
-          tags: ${{ needs.build.outputs.image_base }}-frontend:${{ github.sha }}
+          tags: |
+            ${{ needs.build.outputs.image_base }}-frontend:${{ github.sha }}
+            ${{ needs.build.outputs.image_base }}-frontend:latest
           cache-from: type=gha,scope=frontend
 
-      - name: Push backend tagged by commit SHA
+      - name: Push backend (SHA + latest alias)
         uses: docker/build-push-action@v6
         with:
           context: ${{ hashFiles('backend/Dockerfile') != '' && './backend' || './tools/stub-backend' }}
           push: true
-          tags: ${{ needs.build.outputs.image_base }}-backend:${{ github.sha }}
+          tags: |
+            ${{ needs.build.outputs.image_base }}-backend:${{ github.sha }}
+            ${{ needs.build.outputs.image_base }}-backend:latest
           cache-from: type=gha,scope=backend
 
       - name: Assert both SHA tags exist in the registry
@@ -99,6 +141,40 @@ jobs:
           done
         env:
           IMAGE_BASE: ${{ needs.build.outputs.image_base }}
+
+      - name: Record the digests (deploy is by digest-addressable SHA)
+        run: |
+          set -euo pipefail
+          for image in frontend backend; do
+            ref="${IMAGE_BASE}-${image}:${GITHUB_SHA}"
+            digest=$(docker buildx imagetools inspect "$ref" --format '{{json .Manifest}}' | jq -r '.digest')
+            echo "digest: $ref@$digest"
+            echo "### \`$ref\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "$ref@$digest" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "$digest" > "/tmp/${image}.digest"
+          done
+        env:
+          IMAGE_BASE: ${{ needs.build.outputs.image_base }}
+
+      - name: Syft SBOM (frontend)
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ needs.build.outputs.image_base }}-frontend:${{ github.sha }}
+          format: spdx-json
+          artifact-name: sbom-frontend-${{ github.sha }}.spdx.json
+          output-file: frontend-sbom.spdx.json
+
+      - name: Syft SBOM (backend)
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ needs.build.outputs.image_base }}-backend:${{ github.sha }}
+          format: spdx-json
+          artifact-name: sbom-backend-${{ github.sha }}.spdx.json
+          output-file: backend-sbom.spdx.json
 
   deploy-k8s:
     needs: publish # gated: deploy only after the SHA images are published
@@ -170,6 +246,20 @@ jobs:
           sed -i -E "s|newTag: .*|newTag: ${SHA}|" "k8s/overlays/${OVERLAY}/kustomization.yaml"
           kubectl kustomize "k8s/overlays/${OVERLAY}" > /tmp/manifest.yaml
           grep -E '^\s+image:' /tmp/manifest.yaml
+          # Guard the -8 "deploying :latest" deduction at the point of truth: the
+          # rendered manifest is the thing kubectl is about to apply, so assert on
+          # it rather than trusting the sed above.
+          if grep -E '^\s+image:' /tmp/manifest.yaml | grep -q ':latest'; then
+            echo "::error::rendered manifest pins :latest -- refusing to deploy"
+            grep -E '^\s+image:' /tmp/manifest.yaml
+            exit 1
+          fi
+          if grep -E '^\s+image:' /tmp/manifest.yaml | grep -vq ":${SHA}$"; then
+            echo "::error::rendered manifest does not pin the commit SHA ${SHA}"
+            grep -E '^\s+image:' /tmp/manifest.yaml
+            exit 1
+          fi
+          echo "deploy-by-SHA assertion passed: every image is pinned to ${SHA}"
           kubectl apply -f /tmp/manifest.yaml
           # Base carries no ingressClassName (each environment's default
           # controller serves it); name the kind controller explicitly.
