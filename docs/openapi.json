@@ -458,7 +458,8 @@
               "llm:groq",
               "llm:ollama",
               "rules",
-              "rules:fallback"
+              "rules:fallback",
+              "simulated"
             ],
             "title": "Triaged By",
             "description": "Which provider decided this triage"
