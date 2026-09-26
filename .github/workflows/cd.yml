@@ -57,7 +57,9 @@ jobs:
           --health-timeout 3s
           --health-retries 12
     env:
-      DATABASE_URL: postgresql+psycopg://civicpulse:civicpulse@localhost:5432/civicpulse
+      # Same disposable service credential as POSTGRES_PASSWORD above (and as
+      # ci.yml): ephemeral container, job-scoped, never a real secret.
+      DATABASE_URL: postgresql+psycopg://civicpulse:civicpulse@localhost:5432/civicpulse # NOSONAR
       REDIS_URL: redis://localhost:6379/0
       TRIAGE_PROVIDER: simulated
       RATE_LIMIT_PER_MIN: "1000"
