@@ -8,7 +8,7 @@ from app.domain import Category, Priority, Status
 from app.repositories.complaint_repository import ComplaintRepository
 from app.seed_data import SEED_COMPLAINTS
 
-SEED_NAMESPACE = uuid.UUID("6f1c0a2e-3b8d-4c57-9a41-0d2f5e7b8c19")   # fixed, so ids are stable forever
+SEED_NAMESPACE = uuid.UUID("6f1c0a2e-3b8d-4c57-9a41-0d2f5e7b8c19")  # fixed: stable ids
 
 
 def _status_for(i: int) -> Status:
@@ -26,7 +26,7 @@ def run_seed(session: Session) -> tuple[int, int]:
     for i, (category, priority, location, text) in enumerate(SEED_COMPLAINTS):
         created = now - timedelta(hours=5 * (len(SEED_COMPLAINTS) - i))
         rows.append({
-            "id": uuid.uuid5(SEED_NAMESPACE, text),          # same text -> same id -> no duplicate row
+            "id": uuid.uuid5(SEED_NAMESPACE, text),          # same text -> same id
             "text": text, "location": location, "reporter_contact": None,
             "category": Category(category), "priority": Priority(priority),
             "status": _status_for(i), "ai_summary": _summary(text),

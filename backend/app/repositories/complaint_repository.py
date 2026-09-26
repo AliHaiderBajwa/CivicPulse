@@ -17,7 +17,7 @@ class ComplaintRepository:
     def add(self, **fields: Any) -> Complaint:
         obj = Complaint(**fields)
         self._s.add(obj)
-        self._s.flush()                      # server defaults (id, timestamps) come back via RETURNING
+        self._s.flush()                      # server defaults come back via RETURNING
         return obj
 
     def get(self, complaint_id: uuid.UUID) -> Complaint | None:

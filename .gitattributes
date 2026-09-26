@@ -1,0 +1,10 @@
+# Never let a checkout's line-ending conversion corrupt executables:
+# a CRLF shebang (`#!/bin/sh\r`) fails at container start.
+* text=auto
+*.sh text eol=lf
+*.py text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.toml text eol=lf
