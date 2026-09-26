@@ -246,6 +246,11 @@ jobs:
           echo "$resp" | jq -e '.category | IN("water","electricity","sanitation","roads","streetlights","other")'
           id=$(echo "$resp" | jq -r .id)
           curl -sf "http://localhost:8080/api/complaints/$id" | jq -e ".id == \"$id\""
+
+          # writes must invalidate the stats cache (E2), not wait out the TTL
+          c3=$(curl -sD- -o/dev/null http://localhost:8080/api/stats | awk 'tolower($1)=="x-cache:"{print $2}' | tr -d '\r')
+          test "$c3" = "MISS"
+          echo "X-Cache after write: $c3"
           echo "integration smoke OK"
 
       - name: Infra smoke via stub (activates real path when backend lands)
