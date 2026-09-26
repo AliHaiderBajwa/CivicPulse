@@ -1,0 +1,18 @@
+$ sed -n '62,70p' compose.yaml  (after resolution)
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3).status==200 else 1)"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    deploy:
+      resources:
+
+$ git show --stat HEAD (two parents = real merge, not a squash)
+parents: 0a699160c8ae8cc47bd54e2625e8539ce15b847d 7c5de58a6778e73c623e15f178eb3fe51ceeb5b2
+chore(compose): resolve healthcheck conflict in favour of 5s interval
+
+ compose.yaml                          |  2 +-
+ docs/evidence/02-conflict-markers.txt | 24 ++++++++++++++++++++++++
+ 2 files changed, 25 insertions(+), 1 deletion(-)
