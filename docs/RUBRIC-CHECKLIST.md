@@ -87,5 +87,5 @@ One box per rubric line. Tick only when **evidence exists** (code, screenshot, l
 
 ## Submission gate (run before submitting)
 - [x] `python3 scripts/check_submission.py` clean
-- [ ] no `.env` in git history
+- [x] no `.env` in git history (proved by `scripts/check_submission.py` checks 1-2)
 - [ ] cd.yml success link · GHCR SHA image links · video link · shortlog · hpa capture + chart
