@@ -26,10 +26,10 @@ One box per rubric line. Tick only when **evidence exists** (code, screenshot, l
 - [x] C7 ≥14 backend tests, unit and integration, deterministic, coverage ≥65% — 3 (76 tests across 14 files, 91.90% coverage, five consecutive zero-flake runs, CI-environment simulation with fakeredis absent; evidence/27)
 
 ## D · Data layer — 12
-- [ ] D1 Alembic migrations; zero schema DDL in application startup code — 4
-- [ ] D2 schema complete incl. triaged_by, ai_summary, triage_latency_ms, timestamptz — 3
+- [x] D1 Alembic migrations; zero schema DDL in application startup code — 4 (evidence/23: upgrade head → downgrade base → upgrade head all exit 0; grep `CREATE TABLE|ALTER TABLE|DROP TABLE` over backend/app returns nothing — the lifespan only invokes `alembic upgrade head`)
+- [x] D2 schema complete incl. triaged_by, ai_summary, triage_latency_ms, timestamptz — 3 (evidence/23 §psql \d: all columns + triaged_by CHECK incl. `simulated`, summary ≤140, timestamptz created_at/updated_at with now() defaults)
 - [ ] D3 two indexes, each justified by a named query in notes — 2
-- [ ] D4 idempotent seed of ≥30 realistic complaints; running twice changes nothing — 3
+- [x] D4 idempotent seed of ≥30 realistic complaints; running twice changes nothing — 3 (evidence/23: run 1 inserted 34, run 2 inserted 0/skipped 34; 34 rows, 6 categories, 4 statuses; uuid5 + ON CONFLICT)
 
 ## E · Cache layer — 10
 - [x] E1 /api/stats read-through cache, 30 s TTL, correct X-Cache header — 3 (evidence/25 §2: MISS→HIT, stats_ttl_s=30, header on every 200)
@@ -41,7 +41,7 @@ One box per rubric line. Tick only when **evidence exists** (code, screenshot, l
 - [x] F1 TriageProvider interface with ≥3 working implementations selected by env var — 5 (rules/simulated/llm/ollama via TRIAGE_PROVIDER; evidence/24 factory + per-provider checks)
 - [x] F2 structured output requested and validated against Pydantic schema; malformed output rejected safely — 5 (evidence/24: parse_triage rejects bad category/confidence; malformed → ProviderError → fallback, never retried)
 - [x] F3 timeout, single jittered retry on retryable errors only, fallback to rules, triaged_by recorded — 6 (evidence/24: 503 retried once with jitter, 401/400 not retried, timeout retried; evidence/25 §6 rules:fallback + triaged_by)
-- [ ] F4 content-hash caching of triage results with measured, reported hit rate — 3 (mechanism proven in evidence/24 miss→hit + hit counter; still owes the duplicate-submit script + hit-rate number in notes)
+- [ ] F4 content-hash caching of triage results with measured, reported hit rate — 3 (mechanism proven in evidence/24 miss→hit; **duplicate-submit script shipped in PR #27** — `scripts/triage_hit_rate.py` measured **hit_rate = 0.75** (30 hits/10 misses/40 lookups, expected (4−1)/4) twice, evidence/28 [1]; still needs the number in TRIAGE.md before ticking)
 - [x] F5 prompt-injection guardrail plus a test submitting an injection attempt — 3 (evidence/24: tag-early injection attempt cannot escape the tag)
 - [x] F6 triage_latency_ms recorded and surfaced through /api/meta/providers — 2 (evidence/25 §5: recent_triages[].latency_ms populated per outcome)
 - [ ] F7 PII/data-governance ADR: what leaves machine, to whom, why acceptable — 1
