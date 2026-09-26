@@ -65,7 +65,7 @@ class LLMTriage:
         )
         return resp.choices[0].message.content or ""
 
-    def triage(self, text: str, location: str) -> TriageResult:
+    def triage(self, text: str, location: str) -> TriageResult:  # NOSONAR: location is part of the TriageProvider interface
         for attempt in (1, 2):                     # one call plus at most one retry
             try:
                 raw = self._call(text)

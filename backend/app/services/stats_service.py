@@ -25,7 +25,9 @@ class StatsService:
 
     def _compute(self) -> dict:
         def fill(enum_cls: type[Enum], counts: dict[str, int]) -> dict[str, int]:
-            return {m.value: counts.get(m.value, 0) for m in enum_cls}   # zero-fill missing buckets
+            # __members__.values(): iterates explicitly (Sonar S5864) and zero-fills
+            # every enum value, including ones absent from the result set.
+            return {m.value: counts.get(m.value, 0) for m in enum_cls.__members__.values()}
         return {
             "total": self._repo.total(),
             "by_category": fill(Category, self._repo.counts(Complaint.category)),

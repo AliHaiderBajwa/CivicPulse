@@ -9,13 +9,16 @@ from app.providers.triage.simulated import SimulatedTriage
 
 
 def build_provider(s: Settings) -> TriageProvider:
+    provider: TriageProvider
     if s.triage_provider == "rules":
-        return RuleBasedTriage()
-    if s.triage_provider == "simulated":
-        return SimulatedTriage(s.simulated_fail_mode, s.simulated_delay_s)
-    if s.triage_provider == "ollama":
+        provider = RuleBasedTriage()
+    elif s.triage_provider == "simulated":
+        provider = SimulatedTriage(s.simulated_fail_mode, s.simulated_delay_s)
+    elif s.triage_provider == "ollama":
         client = OpenAI(api_key="ollama", base_url=s.ollama_url, timeout=s.llm_timeout_s, max_retries=0)
-        return OllamaTriage(client=client, model=s.ollama_model)
-    client = OpenAI(api_key=s.llm_api_key.get_secret_value() or "missing", base_url=s.llm_base_url,
-                    timeout=s.llm_timeout_s, max_retries=0)
-    return LLMTriage(client=client, model=s.llm_model, name=s.llm_label)
+        provider = OllamaTriage(client=client, model=s.ollama_model)
+    else:
+        client = OpenAI(api_key=s.llm_api_key.get_secret_value() or "missing", base_url=s.llm_base_url,
+                        timeout=s.llm_timeout_s, max_retries=0)
+        provider = LLMTriage(client=client, model=s.llm_model, name=s.llm_label)
+    return provider

@@ -15,7 +15,9 @@ class HealthService:
         try:
             self._repo.ping()
             state["postgres"] = True
-        except Exception as exc:  # noqa: BLE001 — readiness reports any DB failure, not a few types
+        # Broad catch is the readiness contract: ANY DB failure must surface as
+        # postgres=false, not only a handful of exception types.
+        except Exception as exc:  # noqa: BLE001
             log.debug("postgres unreachable during readiness", extra={"error_class": type(exc).__name__})
         state["redis"] = self._cache.ping()
         return state
