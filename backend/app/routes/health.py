@@ -1,7 +1,12 @@
-from fastapi import APIRouter, HTTPException, Response
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Response
+from fastapi.responses import JSONResponse
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
-from app.schemas import Ready
+from app.deps import get_health_service
+from app.schemas import Ready, ReadyDependencies
+from app.services.health_service import HealthService
 
 router = APIRouter()
 
@@ -19,8 +24,13 @@ def health() -> dict[str, str]:
     summary="Readiness: Postgres and Redis both reachable",
     responses={503: {"model": Ready, "description": "Named dependency is unreachable"}},
 )
-def ready() -> Ready:
-    raise HTTPException(status_code=501, detail="Not implemented yet — issue #5")
+def ready(svc: Annotated[HealthService, Depends(get_health_service)]) -> Ready | JSONResponse:
+    state = svc.check()
+    if all(state.values()):
+        return Ready(status="ok", dependencies=ReadyDependencies(**state))
+    # Liveness vs readiness: a dead DB should take this pod OUT of rotation (503),
+    # never RESTART it (/health does not care about the DB at all).
+    return JSONResponse(status_code=503, content={"status": "degraded", "dependencies": state})
 
 
 @router.get(

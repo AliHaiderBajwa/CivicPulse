@@ -314,4 +314,74 @@ Quality Gate stops failing, and #3's PR survives dev moving underneath it.
 **Next:** Ali reviews #23 → merge → tick D1–D4 → issue #4 triage providers
 (always-raise → 201 `rules:fallback` is the non-negotiable test) → #5, #6, #10.
 
+## M11 — complaints/stats/meta/health routes live, 12 rubric boxes ticked (2026-09-26)
+
+**Expected:** issue #5+#6's application layer lands — routes wired through to the
+services, verified over real HTTP against cp-pg/cp-redis, contract untouched,
+with enough evidence to tick the C/E/F boxes this batch actually earns.
+
+**Achieved:**
+- **Routes implemented** on `feat/complaints-api` (stacked on #4 + #3 branches):
+  `complaints` (create/list/get/status), `stats`, `meta/providers`, `health`
+  (`/ready` returns 503 `degraded` when either dependency is down), plus the
+  Redis rate-limit dependency on POST. DI in `deps.py` uses `Annotated` (ruff
+  B008-clean); routes return service results and let `response_model` serialize
+  (mypy-clean, contract export byte-identical).
+- **End-to-end proof** (`docs/evidence/25-complaints-api.txt`): 201 with
+  `triaged_by:"simulated"` and triage-derived category; field-level 400s;
+  404/409 messages verbatim; stats MISS→HIT→MISS-invalidation; 3×201 then 429
+  with `retry-after: 60`; `/health` **200 while Postgres auth is broken** and
+  `/ready` 503 `degraded` (liveness/readiness split, C4's whole point);
+  `SIMULATED_FAIL_MODE=raise` → **201 + `triaged_by:"rules:fallback"` + one
+  WARNING JSON line** (hard rule held on the request path, not just in unit
+  tests); structured access logs with `request_id` echoed as `x-request-id`.
+- **Gates:** ruff 0, mypy 0 (39 files), exporter re-run → `git diff
+  docs/openapi.json` empty after implementing everything.
+- **12 checklist boxes ticked with pointers:** C1–C4 (C2 grep proof: no SQL
+  outside repositories), E1–E3, F1–F3, F5, F6. F4 deliberately left open
+  (still owes the duplicate-submit hit-rate script + number).
+- Two PS gotchas avoided after earlier incidents: curl bodies sent via `-d
+  @file` (PS 5.1 mangles embedded quotes), all UTF-8 edits via the edit tool.
+
+**Evidence:** commits `ac1ed2d` (services), `270c4b7` (DI), `bbd6cef` (routes),
+`9d2e2cd` (evidence 25); `docs/evidence/25-complaints-api.txt`.
+
+**Next:** Dockerfile + `.dockerignore` + SIGTERM drain proof (C6) + compose AOF
+(E4) → push, PR `Closes #5, Closes #6` (Dockerfile rides along per Ali's
+ruling) → then #10 test suite, #17, #18 docs.
+
+## M12 — backend image + SIGTERM drain + AOF verified, G/C6/E4 boxes ticked (2026-09-26)
+
+**Expected:** the #5+#6 PR gets its image (Ali's ruling: Dockerfile lands with
+working endpoints, and the endpoints are done), the graceful-shutdown claim
+gets proven rather than asserted, and the compose AOF gets pointed at.
+
+**Achieved:**
+- **`backend/Dockerfile`** (multi-stage, `python:3.12.13-slim-bookworm` exact
+  patch tag, deps layer before source, numeric `USER 10001:10001`, exec-form
+  CMD with `--timeout-graceful-shutdown 20`, urllib HEALTHCHECK) +
+  `.dockerignore`. Cold `--no-cache` build exit 0; image 74.1 MB.
+- **Context sizes reported both ways, both images** (G2): backend 48 files /
+  0.07 MB with ignore vs 8129 / 195.72 MB without (149 MB = `.venv`);
+  frontend 19 / 0.21 MB vs 9476 / 110.5 MB. A fresh `buildx` builder gave a
+  truthful cold transfer line (175.34 kB) because repeat builds show
+  BuildKit's incremental near-empty line — noted in the evidence, not hidden.
+- **SIGTERM drain proven live (C6):** POST fired, SIGTERM 0.7 s later,
+  uvicorn "Waiting for connections to close", the request **completed 201 at
+  5.22 s** (`duration_ms=5218.9`), then `shutdown: closing connection pools`
+  and clean `exit=0`. `docker stop` took 5.4 s. K8s note recorded for Ali:
+  `terminationGracePeriodSeconds >= 30`.
+- **E4:** compose already carries `--appendonly yes` on the named `redisdata`
+  volume with the rationale comment at `compose.yaml:101-102` — ticked with a
+  pointer instead of re-doing finished work.
+- **4 more boxes:** C6, E4, G1, G2 (16 total ticked this session across
+  M11+M12).
+
+**Evidence:** `docs/evidence/26-backend-image-drain-aof.txt`; commits
+`e6c5691` (M11 docs), `4d35bb2` (image + evidence 26).
+
+**Next:** push the branch, open PR `Closes #5, Closes #6` (Dockerfile rides
+along per Ali) → then #10 test suite (activates CI's real jobs), #17
+/metrics wiring + X-Forwarded-For note for Ali, #18 docs/ADRs.
+
 <!-- New entries above this line. -->
