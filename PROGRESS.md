@@ -195,4 +195,40 @@ alias, SBOM artifact sizes), `docs/evidence/21-postgres-persistence.txt`.
 assertion to the integration job, which only becomes meaningful once his Redis
 cache exists.
 
+
+## M8 — A5 deliberate conflict produced and resolved, PR #21 awaiting Ashar review (2026-09-26)
+
+**Expected:** per issue #19 and `docs/PLAN.md` A5 — one deliberate conflict on real
+code, resolved, with markers/resolution/merge evidence + rationale. Ashar opened
+PR #20 (backend healthcheck `10s→5s`); Ali reviewed it (verified the 5s claim
+against the database/cache 5s cadence at compose.yaml:89/:111), approved, and
+merged it as `7c5de58` with `--merge` to keep the topology.
+
+**Achieved:**
+- Ali branched `feat/healthcheck-conflict-ali` from the **pre-merge** base
+  `07648b1` (branching from updated dev would have fast-forwarded — the one way
+  this exercise fails), changed the same line to `30s` (`0a69916`), pushed, and
+  merged `origin/dev` → genuine `CONFLICT (content)` on `compose.yaml:65`, with
+  `<<<<<<< HEAD (30s)` vs `>>>>>>> origin/dev (5s)` exactly as git left them.
+- Resolved to **5s** (`c37ef00`, a true two-parent merge): 5s matches the
+  db/cache cadence, detects a dead backend in ~15s not ~45s, costs one localhost
+  HTTP request, and `start_period: 15s` still absorbs slow startups. 30s saved
+  nothing measurable.
+- Evidence per #19: `docs/evidence/02-conflict-markers.{txt,png}`,
+  `03-conflict-resolved.{txt,png}`, `04-merge-graph.{txt,png}`. Method disclosed:
+  this machine has no GUI screenshotting, so the `.txt` files are byte-exact
+  terminal captures and the `.png` files are renders of those exact bytes
+  (Pillow + DejaVu Sans Mono, one PNG visually verified before commit). The raw
+  states additionally live in history: `0a69916` vs `ac5bf30` vs `c37ef00`.
+- PR **#21** opened into `dev` with the rationale in the body, `ashar1x`
+  requested as reviewer, all 8 checks green. Merge waits for his approval —
+  his review is the second half of the pair evidence, so A5 stays unticked
+  until then.
+
+**Evidence:** PR #20 (merged `7c5de58`, Ali's approving review on record), merge
+commit `c37ef00`, PR #21 (open, checks green).
+
+**Next:** Ashar reviews #21 → merge → tick A5, close #19 → continue J-block
+(ADRs, RUNBOOK, ENGINEERING-NOTES) and `scripts/check_submission.py`.
+
 <!-- New entries above this line. -->
