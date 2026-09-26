@@ -3,10 +3,10 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from alembic import command
 from alembic.config import Config as AlembicConfig
 from fastapi import FastAPI
 
+from alembic import command
 from app.config import Settings
 from app.deps import get_engine, get_redis, get_settings
 from app.logging_config import configure_logging

@@ -2,7 +2,8 @@ from app.domain import Category, Priority
 from app.providers.triage.base import TriageResult
 
 _CATEGORY_KEYWORDS: dict[Category, tuple[str, ...]] = {
-    Category.WATER: ("water", "pani", "paani", "pipe", "leak", "tanker", "tap ", "tubewell", "flood"),
+    Category.WATER: ("water", "pani", "paani", "pipe", "leak", "tanker",
+                     "tap ", "tubewell", "flood"),
     Category.ELECTRICITY: ("electric", "bijli", "power", "voltage", "transformer", "wire",
                            "meter", "load shedding", "loadshedding", "outage", "spark"),
     Category.SANITATION: ("sewage", "sewerage", "gutter", "nali", "drain", "kachra", "garbage",
@@ -25,7 +26,7 @@ class RuleBasedTriage:
     name = "rules"
 
     # `location` is unused here but is part of the TriageProvider interface.
-    def triage(self, text: str, location: str) -> TriageResult:  # NOSONAR(python:S1172)
+    def triage(self, text: str, location: str) -> TriageResult:  # NOSONAR
         t = text.lower()
         scores = {c: sum(1 for k in kws if k in t) for c, kws in _CATEGORY_KEYWORDS.items()}
         category, best = max(scores.items(), key=lambda kv: kv[1])   # ties: first in dict order

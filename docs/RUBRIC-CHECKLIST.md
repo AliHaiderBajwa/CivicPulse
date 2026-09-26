@@ -23,13 +23,13 @@ One box per rubric line. Tick only when **evidence exists** (code, screenshot, l
 - [x] C4 /health and /ready correctly distinguished; /health does not touch the database — 3 (evidence/25 §11: dead DB → /health 200, /ready 503 degraded)
 - [x] C5 structured JSON logging to stdout with propagated request_id — 3
 - [x] C6 SIGTERM handled: in-flight requests drain before exit — 2 (evidence/26 §3: SIGTERM at +0.7s, in-flight POST finished 201 at 5.2s, pools closed after, exit=0)
-- [ ] C7 ≥14 backend tests, unit and integration, deterministic, coverage ≥65% — 3
+- [x] C7 ≥14 backend tests, unit and integration, deterministic, coverage ≥65% — 3 (76 tests across 14 files, 91.90% coverage, five consecutive zero-flake runs, CI-environment simulation with fakeredis absent; evidence/27)
 
 ## D · Data layer — 12
-- [ ] D1 Alembic migrations; zero schema DDL in application startup code — 4
-- [ ] D2 schema complete incl. triaged_by, ai_summary, triage_latency_ms, timestamptz — 3
+- [x] D1 Alembic migrations; zero schema DDL in application startup code — 4 (evidence/23: upgrade head → downgrade base → upgrade head all exit 0; grep `CREATE TABLE|ALTER TABLE|DROP TABLE` over backend/app returns nothing — the lifespan only invokes `alembic upgrade head`)
+- [x] D2 schema complete incl. triaged_by, ai_summary, triage_latency_ms, timestamptz — 3 (evidence/23 §psql \d: all columns + triaged_by CHECK incl. `simulated`, summary ≤140, timestamptz created_at/updated_at with now() defaults)
 - [x] D3 two indexes, each justified by a named query in notes — 2 (ENGINEERING-NOTES "Reason for each index": `ix_complaints_created_at` ← feed ORDER BY at complaint_repository.py:42; `ix_complaints_status_priority` ← filtered queue at :35-39; schema in evidence/23)
-- [ ] D4 idempotent seed of ≥30 realistic complaints; running twice changes nothing — 3
+- [x] D4 idempotent seed of ≥30 realistic complaints; running twice changes nothing — 3 (evidence/23: run 1 inserted 34, run 2 inserted 0/skipped 34; 34 rows, 6 categories, 4 statuses; uuid5 + ON CONFLICT)
 
 ## E · Cache layer — 10
 - [x] E1 /api/stats read-through cache, 30 s TTL, correct X-Cache header — 3 (evidence/25 §2: MISS→HIT, stats_ttl_s=30, header on every 200)
@@ -41,7 +41,7 @@ One box per rubric line. Tick only when **evidence exists** (code, screenshot, l
 - [x] F1 TriageProvider interface with ≥3 working implementations selected by env var — 5 (rules/simulated/llm/ollama via TRIAGE_PROVIDER; evidence/24 factory + per-provider checks)
 - [x] F2 structured output requested and validated against Pydantic schema; malformed output rejected safely — 5 (evidence/24: parse_triage rejects bad category/confidence; malformed → ProviderError → fallback, never retried)
 - [x] F3 timeout, single jittered retry on retryable errors only, fallback to rules, triaged_by recorded — 6 (evidence/24: 503 retried once with jitter, 401/400 not retried, timeout retried; evidence/25 §6 rules:fallback + triaged_by)
-- [x] F4 content-hash caching of triage results with measured, reported hit rate — 3 (`scripts/triage_hit_rate.py` + docs/evidence/28: hit_rate 0.75 = 30 hits/10 misses/40 lookups, two identical runs; reported in docs/TRIAGE.md §3 and ENGINEERING-NOTES "measured cache hit rate"; mechanism in evidence/24)
+- [x] F4 content-hash caching of triage results with measured, reported hit rate — 3 (`scripts/triage_hit_rate.py` shipped in PR #27 + docs/evidence/28 [1]: hit_rate 0.75 = 30 hits/10 misses/40 lookups, expected (4−1)/4, two identical runs; reported in docs/TRIAGE.md §3 and ENGINEERING-NOTES "measured cache hit rate"; mechanism in evidence/24)
 - [x] F5 prompt-injection guardrail plus a test submitting an injection attempt — 3 (evidence/24: tag-early injection attempt cannot escape the tag)
 - [x] F6 triage_latency_ms recorded and surfaced through /api/meta/providers — 2 (evidence/25 §5: recent_triages[].latency_ms populated per outcome)
 - [x] F7 PII/data-governance ADR: what leaves machine, to whom, why acceptable — 1 (docs/adr/0004-pii-and-data-governance.md: per-provider egress table, reporter_contact structurally never passed (complaint_service.py:21), redaction before egress (triage_orchestrator.py:42), SecretStr key)

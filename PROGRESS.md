@@ -384,6 +384,110 @@ gets proven rather than asserted, and the compose AOF gets pointed at.
 along per Ali) → then #10 test suite (activates CI's real jobs), #17
 /metrics wiring + X-Forwarded-For note for Ali, #18 docs/ADRs.
 
+## M13 — Issue #10: test suite + CI activation (Ashar + AI agent)
+
+**Expected:** ≥14 deterministic backend tests with coverage ≥65% and no
+`time.sleep()`; activate CI's lint-and-type / test-backend / integration jobs
+(their trigger is `backend/pyproject.toml`) without letting a red required
+check land on `dev`.
+
+**Achieved:**
+- **`backend/tests/` — 76 tests across 14 files** (guide target 14): state
+  machine (21), API behaviour incl. field-level 400s, 404/409 wording,
+  pagination and `X-Request-ID` echo (9), LLM provider: malformed output not
+  retried, 400 never retried, one retry on timeout/429/5xx (11), injection
+  guardrail (2), rules table (9), cache MISS→HIT + duplicate-text served by
+  one provider call + fallback never cached (5), redaction (5), `/ready` with
+  dead Postgres and dead Redis (3), rate limit + per-client `X-Forwarded-For`
+  window (2), meta+factory (3), metrics (2), JSON logging (2), seed
+  idempotence (1), and the assignment's required provider-failure → 201
+  `rules:fallback` (1). **Coverage 91.90%** (gate 65%); **five consecutive
+  full runs, 76 passed each time, zero flakes**; no `time.sleep` anywhere
+  (LLM jitter injected as `sleep=lambda s: None`).
+- **CI simulated before push, not hoped for:** a throwaway venv ran CI's
+  exact install sequence — `pip install -e .` fails by design (tool-only
+  pyproject) → `requirements.txt` fallback fires; `pytest pytest-cov httpx`
+  only, **fakeredis absent** → conftest falls back to CI's real Redis service
+  container; `DATABASE_URL` without `_test` + `GITHUB_ACTIONS=true` exercises
+  the CI branch of the guard, while a local run against the dev DB is refused
+  (exit 2) before any fixture executes.
+- **Migrate-on-boot:** the integration job does `docker compose up` on an
+  *empty* database with no manual migration step — `backend/entrypoint.sh`
+  now runs `alembic upgrade head` (+ idempotent seed) and `exec`s uvicorn so
+  PID 1 and the SIGTERM drain stay intact; invoked via `sh` so the
+  bind-mounted checkout never needs an exec bit; `.gitattributes` pins
+  `*.sh` to LF (a CRLF shebang fails at container start).
+- **Integration sequence executed against a real stack:** four services
+  healthy on a fresh DB, X-Cache MISS→HIT, POST 201 with enum-validated
+  category, GET-by-id assertion OK; torn down with `down -v`.
+- ruff (new `pyproject` config: E,F,I,B,UP @ 100 columns) and mypy
+  (`check_untyped_defs`) both green; OpenAPI export byte-identical.
+
+**Evidence:** `docs/evidence/27-test-suite.txt` (gates, 5× determinism, CI-venv
+simulation, guard refusal, integration summary, test inventory); commit
+`75376bd`.
+
+**Next:** push + PR `Closes #10` (stacked on PR #25) → #17 (/metrics wiring,
+XFF note for Ali, F4 hit-rate script) → #18 docs/ADRs.
+
+## M14 — Ali's blocking review answered (lifespan migration), issue #17 proven, F4 measured (2026-09-26)
+
+**Expected:** close Ali's CHANGES_REQUESTED on PR #25 — nothing migrated a fresh
+database — with exactly the lifespan `alembic upgrade head` he specified, fix the
+inverted rate-limiter sentence in the PR body, keep the stacked test-suite PR
+green through the Sonar gate; then finish issue #17's acceptance proof and the
+F4 measurement the checklist still owed.
+
+**Achieved:**
+- **PR #25 blocking fix (`4416cd1`):** the lifespan runs `apply_migrations()`
+  via `asyncio.to_thread` before serving; `alembic.ini`'s `%(here)s` plus
+  env.py's environ lookup make it cwd-independent, so compose (which starts
+  `uvicorn` directly), kind/CD and `scripts/k8s-up.sh` all migrate a fresh DB
+  with zero infra changes. Ali's concurrency note is in the code verbatim
+  (transactional DDL → losing replica aborts, restarts, retries, then no-ops
+  at head). Live proof on a brand-new empty database: boot log
+  `Running upgrade → 0001, initial schema` → `POST /api/complaints` 201 →
+  `alembic_version=0001`, no manual alembic anywhere (evidence/25 [12]).
+  The PR body's "malformed JSON is rejected before the limiter runs" claim was
+  corrected — router-level `Depends` run before body parsing, so garbage **is**
+  counted. `origin/dev` (#23/#24 merges) synced, **8/8 green at `4416cd1`**,
+  review reply posted (comment 5848848629).
+- **PR #26 synced and 8/8 green at `103ea6e` + `3521916`:** all 10 Sonar
+  findings cleared (`8f8d4d5`) — S6504 by making the boot script root-owned,
+  S9100 useless-yield removal, S9073 assertion splits, S1172+S7632 via bare
+  `# NOSONAR` (the parenthesized rule-id syntax is rejected by the python
+  analyzer), S8786 with the poss-side benchmark written into the comment;
+  plus three new CI tests for #17's claims (both histograms exposed, fallback
+  counter delta == 1 per degradation, `/metrics` 200 after the POST limiter
+  returns 429) — **79 passed, 91.99% coverage**, ruff/mypy clean.
+- **Issue #17 acceptance proven end-to-end (PR #27, evidence/28):** all five
+  required series; a live always-raise provider (`SIMULATED_FAIL_MODE=raise`)
+  → 201 `rules:fallback` with `triage_fallback_total` absent → 1.0 (delta
+  exactly +1); the 11th/12th POST from one client → 429 while `GET /metrics`
+  stays 200; Postgres stopped under a running app → `/health` 200,
+  `/ready` 503, `/metrics` 200, recovery after `docker start`. The one
+  behaviour change the lifespan migration brings is documented honestly: with
+  an unreachable DB the app now *fails fast at boot* (uvicorn exits non-zero,
+  the sanctioned abort/restart semantics) instead of serving degraded — the
+  runtime-death evidence in evidence/25 [11] still stands and was re-proved.
+- **F4 measured: hit_rate = 0.75** (30 hits / 10 misses / 40 lookups, expected
+  (4−1)/4; two identical runs; all 40 POSTs 201; zero fallbacks) from
+  `scripts/triage_hit_rate.py`, which rotates `X-Forwarded-For` so the
+  per-client 10/min limiter cannot pollute the number and exits non-zero on
+  any 429, split mismatch or fallback.
+- **Three data boxes ticked: D1, D2, D4** (evidence/23 up/down/up + full
+  schema + 34-row idempotent seed; grep proves `backend/app` contains no raw
+  DDL — startup only calls `alembic upgrade head`). D3 and F4 deliberately
+  left open until ENGINEERING-NOTES / TRIAGE.md carry their write-ups.
+
+**Evidence:** `docs/evidence/25-complaints-api.txt` [12],
+`docs/evidence/28-metrics-f4.txt`; PR #25 comment 5848848629; 8/8 checks on
+`4416cd1` and on `3521916`'s lineage.
+
+**Next:** PR #27 review closes issue #17 → issue #18 (TRIAGE.md carrying the
+0.75 hit rate + my four ENGINEERING-NOTES answers with file:line refs) → tick
+F4, D3, J5 → A3/A4 process boxes → book the demo video with Ali → dev→main.
+
 ## M15 - issue #18 docs = PR #28 (TRIAGE.md, ENGINEERING-NOTES, ADR 0001+0004) (2026-09-26)
 
 **Expected:** issue #18's deliverables land while their `file:line` refs are
@@ -413,13 +517,17 @@ THE RULE artifacts with the milestone.
   documents.
 - Boxes ticked: **F7** (ADR 0004), **D3** (named-query index reasons),
   **F4** (script + 0.75 + TRIAGE §3).
+- **#25 and #26 both merged into `dev` as merge commits (`3c9ee7e`,
+  `1f5470b`)** with Ali's preconditions verified first (#25 landed, all 8
+  checks green on #26's tip `857fdc1`, run 36265133413); this branch then
+  synced with `origin/dev` and the four append conflicts (PROGRESS,
+  AI-USAGE, checklist, docx) resolved by keeping both sides.
 
 **Evidence:** PR #28 (https://github.com/AliHaiderBajwa/CivicPulse/pull/28);
 `docs/evidence/28-metrics-f4.txt` (F4 hit_rate 0.75).
 
-**Next:** Ali on #26/#27 (queue comment already posted); after #26 merges,
-rebase #28 and resolve the PROGRESS/AI-USAGE/checklist append conflicts by
-keeping both sides, then Ali reviews #28. Then A4 commit-share recompute,
-README API table, demo video, dev -> main.
+**Next:** Ali on #27/#28 (queue comment already posted). Then A4
+commit-share recompute, README API table, RUNBOOK triage section, demo
+video, dev -> main.
 
 <!-- New entries above this line. -->
