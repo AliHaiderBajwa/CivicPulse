@@ -86,6 +86,6 @@ One box per rubric line. Tick only when **evidence exists** (code, screenshot, l
 - [ ] BN5 OpenTelemetry tracing frontend→backend→LLM — +2
 
 ## Submission gate (run before submitting)
-- [ ] `python3 scripts/check_submission.py` clean
+- [x] `python3 scripts/check_submission.py` clean
 - [ ] no `.env` in git history
 - [ ] cd.yml success link · GHCR SHA image links · video link · shortlog · hpa capture + chart

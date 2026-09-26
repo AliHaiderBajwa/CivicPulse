@@ -573,4 +573,56 @@ origin/dev`.
 follow-up, A1/A2/A3 evidence pass with Ali, README API table + RUNBOOK
 triage section, demo video, dev -> main.
 
+## M17 - submission gate = PR #32, RUNBOOK triage half, all four review PRs green (2026-09-27)
+
+**Expected:** close the last gap assignable without Ali - the brief section
+4/5 requirement `scripts/check_submission.py clean` - land the RUNBOOK
+section that is mine, and leave every open PR green for his review.
+
+**Achieved:**
+- **`scripts/check_submission.py` (PR #32, Closes #31)** - 12 checks, one
+  per automatic deduction in brief section 5: `-20` env/key history,
+  `-20/-15` key patterns across tracked files, `-15` k8s base64-decoded +
+  stringData with placeholder exemption, `-8` unpinned images, `-8`
+  localhost service-to-service (probe/ingress-host exempt), `-8`
+  frontend->DB path, `-8` published db/cache ports and non-ClusterIP
+  Services, `-8` ungated publish/deploy jobs, `-8` deploying `:latest`
+  (k8s/compose.prod image fields + `IMAGE_TAG=` + cd.yml's refuse-to-apply
+  guard must exist), `-8` Postgres Deployment without PVC, `-5` direct
+  commits to main via `git rev-list origin/main --not origin/dev`, `-5`
+  quickstart file references.
+- **The gate caught a real defect on its first run**: `.env.example`
+  shipped `IMAGE_TAG=latest` - one `cp` away from the `-8` "deploying
+  :latest" deduction. Fixed (empty + comment, so compose.prod's `:?` guard
+  forces a SHA) and **mutation-tested**: the old value fails check 9 with
+  the exact line, the new value passes. Ruff-clean (16 findings, incl. the
+  blind-except and missing `check=False` the fix pass surfaced).
+- **Publish-vs-deploy ambiguity resolved in the check**: GHCR keeps the
+  brief-required `latest` *alias* (publish), while deploy is field-scanned
+  (k8s `image`/`newTag`, compose.prod, `IMAGE_TAG=`, guard presence) so
+  cd.yml's own `grep ':latest'` refusal and the explanatory comments do
+  not self-flag.
+- **`docs/RUNBOOK.md` (my half of #14)** landed as `8f40adb`: the complete
+  triage-failing section - diagnostics, error-class table, safe actions for
+  compose + k8s, `FLUSHDB` notes, always-raise drill, fail-fast caveat;
+  Ali's deploy/rollback/logs sections scaffolded pending.
+- **Review surface all green**: #27 8/8, #28 8/8 (at `8f40adb`), #30 8/8
+  (at `238e12c`). #30's Sonar sweep: S6698 cleared on both credential
+  literals with justified bare `# NOSONAR` (ephemeral service credential,
+  identical to ci.yml - `POSTGRES_PASSWORD` needed one line, `DATABASE_URL`
+  its own); S8541/S8544 cleared by installing from `requirements.lock`
+  (`--only-binary :all: --no-deps --require-hashes`, the Dockerfile's own
+  recipe) plus pinned `pytest==9.1.1 pytest-cov==7.1.0 httpx==0.28.1` -
+  test-backend green on the pins.
+- Checklist box **`python3 scripts/check_submission.py` clean** ticked.
+
+**Evidence:** PR #32 (Closes #31); gate run 12/12 PASS exit 0;
+`ruff check scripts/check_submission.py` clean; mutation run FAIL at
+`.env.example:21`; PR #30 checks 8/8 at `238e12c`.
+
+**Next:** Ali's reviews on #27/#28/#30/#32 (all green) -> merges in order
+(#30 first: unblocks dev CD) -> entrypoint trim per his a/b pick ->
+A1/A2/A3 evidence pass -> README quickstart staleness (lines 13-15 still
+describe the pre-#25 stub path - his file) -> demo video -> dev -> main.
+
 <!-- New entries above this line. -->
