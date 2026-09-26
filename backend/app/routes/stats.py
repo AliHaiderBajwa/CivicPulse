@@ -1,6 +1,10 @@
-from fastapi import APIRouter, HTTPException, Response
+from typing import Annotated
 
+from fastapi import APIRouter, Depends, Response
+
+from app.deps import get_stats_service
 from app.schemas import Stats
+from app.services.stats_service import StatsService
 
 router = APIRouter(prefix="/api")
 
@@ -11,6 +15,10 @@ router = APIRouter(prefix="/api")
     operation_id="getStats",
     summary="Aggregates by category and priority",
 )
-def get_stats(response: Response) -> Stats:
-    # X-Cache: HIT|MISS is set by the cache layer (issue #6).
-    raise HTTPException(status_code=501, detail="Not implemented yet — issue #6")
+def get_stats(
+    response: Response,
+    svc: Annotated[StatsService, Depends(get_stats_service)],
+):
+    data, hit = svc.get()
+    response.headers["X-Cache"] = "HIT" if hit else "MISS"
+    return data
