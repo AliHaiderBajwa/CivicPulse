@@ -1,0 +1,55 @@
+﻿=== CivicPulse data-layer proof (issue #3) - 2026-09-26T20:27:28 ===
+--- ruff check . ---
+exit=0
+All checks passed!
+--- mypy app --ignore-missing-imports ---
+exit=0
+Success: no issues found in 21 source files
+--- alembic downgrade base (reset to empty) ---
+exit=0
+--- alembic upgrade head ---
+exit=0
+--- psql \d complaints (schema + indexes + checks) ---
+                                   Table "public.complaints"
+      Column       |           Type           | Collation | Nullable |         Default          
+-------------------+--------------------------+-----------+----------+--------------------------
+ id                | uuid                     |           | not null | gen_random_uuid()
+ text              | text                     |           | not null | 
+ location          | character varying(200)   |           | not null | 
+ reporter_contact  | character varying(200)   |           |          | 
+ category          | complaint_category       |           | not null | 
+ priority          | complaint_priority       |           | not null | 
+ status            | complaint_status         |           | not null | 'open'::complaint_status
+ ai_summary        | character varying(140)   |           |          | 
+ triaged_by        | character varying(32)    |           | not null | 
+ triage_latency_ms | integer                  |           | not null | 
+ created_at        | timestamp with time zone |           | not null | now()
+ updated_at        | timestamp with time zone |           | not null | now()
+Indexes:
+    "complaints_pkey" PRIMARY KEY, btree (id)
+    "ix_complaints_created_at" btree (created_at)
+    "ix_complaints_status_priority" btree (status, priority)
+Check constraints:
+    "ck_complaints_location_len" CHECK (char_length(location::text) >= 3 AND char_length(location::text) <= 200)
+    "ck_complaints_summary_len" CHECK (ai_summary IS NULL OR char_length(ai_summary::text) <= 140)
+    "ck_complaints_text_len" CHECK (char_length(text) >= 10 AND char_length(text) <= 2000)
+    "ck_complaints_triaged_by" CHECK (triaged_by::text = ANY (ARRAY['llm:groq'::character varying, 'llm:ollama'::character varying, 'rules'::character varying, 'rules:fallback'::character varying, 'simulated'::character varying]::text[]))
+
+--- alembic downgrade base && alembic upgrade head (reversibility) ---
+downgrade exit=0
+re-upgrade exit=0
+--- python -m app.seed (run 1: expect inserted 34, skipped 0) ---
+exit=0
+seed: inserted 34, skipped 0 (already present)
+--- python -m app.seed (run 2: expect inserted 0, skipped 34) ---
+exit=0
+seed: inserted 0, skipped 34 (already present)
+--- select count(*), count(distinct category), count(distinct status) ---
+ total | categories | statuses 
+-------+------------+----------
+    34 |          6 |        4
+(1 row)
+
+--- alembic current (head = 0001) ---
+exit=0
+0001 (head)
