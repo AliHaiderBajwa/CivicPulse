@@ -32,6 +32,10 @@ class TriageOrchestrator:
     def __init__(self, primary: TriageProvider, fallback: TriageProvider, cache: Cache, ttl_s: int) -> None:
         self._primary, self._fallback, self._cache, self._ttl = primary, fallback, cache, ttl_s
 
+    @property
+    def primary_name(self) -> str:
+        return self._primary.name
+
     def run(self, text: str, location: str) -> TriageOutcome:
         safe = redact(text)                      # only redacted body ever goes to a provider
         key = content_key(self._primary.name, safe)   # text-only key: nine neighbours, one inference

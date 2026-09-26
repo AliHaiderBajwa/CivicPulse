@@ -1,6 +1,10 @@
-from fastapi import APIRouter, HTTPException
+from typing import Annotated
 
+from fastapi import APIRouter, Depends
+
+from app.deps import get_meta_service
 from app.schemas import ProviderMeta
+from app.services.meta_service import MetaService
 
 router = APIRouter(prefix="/api")
 
@@ -11,5 +15,8 @@ router = APIRouter(prefix="/api")
     operation_id="getProviderMeta",
     summary="Active triage provider and last 20 outcomes",
 )
-def get_provider_meta() -> ProviderMeta:
-    raise HTTPException(status_code=501, detail="Not implemented yet — issue #4")
+def get_provider_meta(
+    svc: Annotated[MetaService, Depends(get_meta_service)],
+) -> ProviderMeta:
+    data = svc.providers()
+    return ProviderMeta(active_provider=data["active"], recent_triages=data["recent"])

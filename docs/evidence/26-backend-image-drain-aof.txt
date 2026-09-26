@@ -1,0 +1,72 @@
+================================================================================
+EVIDENCE 26 — backend image, build context, SIGTERM drain, Redis AOF (C6, E4, G)
+Ashar session + opencode, 2026-09-26 — branch feat/complaints-api
+================================================================================
+
+[1] backend/Dockerfile (multi-stage, pinned, non-root, exec CMD)
+
+$ docker inspect civicpulse-backend:drain --format '{{.Config}}'
+User: 10001:10001                     (numeric -> K8s runAsNonRoot can verify)
+Cmd: uvicorn app.main:app --host 0.0.0.0 --port 8000 --no-access-log
+     --timeout-graceful-shutdown 20    (EXEC form: uvicorn is PID 1, gets SIGTERM)
+Healthcheck: python -c "...urlopen('http://127.0.0.1:8000/health'...)"   (no curl in slim)
+ExposedPorts: 8000/tcp
+Base images: python:3.12.13-slim-bookworm (builder + runtime, exact patch tag)
+Layer order (docker history): venv COPY 134MB first, app COPY 397kB LAST
+  -> code edits never invalidate the dependency layer.
+Size: 74.1 MB
+Cold build (--no-cache): exit 0, tag civicpulse-backend:probe.
+
+[2] Build context WITH vs WITHOUT .dockerignore (both contexts — rubric G2)
+
+Direct file enumeration (what tar would include):
+  backend WITH .dockerignore:     48 files,    0.07 MB
+  backend WITHOUT .dockerignore: 8129 files, 195.72 MB   (149 MB of that is .venv alone)
+  frontend WITH .dockerignore:    19 files,    0.21 MB
+  frontend WITHOUT .dockerignore: 9476 files, 110.5 MB    (node_modules)
+BuildKit cold transfer backend WITH ignore (fresh buildx builder, --load):
+  #8 transferring context: 175.34kB done     # ~ the same payload, measured by Docker
+Note: repeat builds show a near-empty transfer line (BuildKit's incremental
+session cache), which is why the cold-builder + enumeration numbers above are
+the ones quoted.
+
+[3] SIGTERM DRAIN (rubric C6) — SIMULATED_DELAY_S=5 in the container
+
+Timeline (all 2026-09-26, container logs):
+  16:49:45.9  curl POST /api/complaints  (unique text -> provider sleep 5 s starts)
+  16:49:46.0  docker stop  ->  "Shutting down"
+  16:49:46.1  "Waiting for connections to close. (CTRL+C to force quit)"
+  ... uvicorn stops accepting, in-flight request keeps running ...
+  16:49:50.678  app.access request status=201 duration_ms=5218.9   <- COMPLETED
+  16:49:50.678  curl received: HTTP_CODE:201 TIME_TOTAL:5.224094s  <- client got it
+  16:49:50.778  "Waiting for application shutdown."
+  16:49:50.778  "shutdown: closing connection pools"
+  16:49:50.779  "Application shutdown complete."  ->  container exited, exit=0
+
+  docker stop elapsed: 5.4s   (returned only after drain)
+  docker inspect: exited exit=0 oomkilled=false
+
+  Response body received mid-shutdown:
+  {"id":"82f08cb3-d496-4823-af79-2ad22a29692a",
+   "text":"SIGTERM drain proof request with unique content xyzzy-20260926",
+   "category":"sanitation","priority":"normal","status":"open",
+   "triaged_by":"simulated","triage_latency_ms":5006,...}
+
+  => zero failed requests: the request that was in flight when SIGTERM arrived
+     finished with 201 BEFORE the process began its own shutdown; pools closed
+     after, not during. K8s note for Ali: terminationGracePeriodSeconds >= 30
+     (20 s uvicorn drain + ~5 s preStop sleep + margin).
+
+[4] REDIS AOF (rubric E4) — compose.yaml
+
+  cache:
+    image: redis:7-alpine
+    # AOF on: the rate-limiter counters must survive a restart — a limiter that
+    # forgets on restart opens a window exactly when the system was unstable.
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data        (top-level named volume `redisdata`)
+  Justification is written down at compose.yaml:101-102; persistence is ON and
+  bound to a named volume, not an anonymous one.
+
+================================================================================
