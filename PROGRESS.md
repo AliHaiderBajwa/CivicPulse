@@ -285,4 +285,33 @@ always-raise → 201 `rules:fallback`) → #5 complaint API/state machine → #6
 cache + limiter → #10 suite (the PR that activates `test-backend` and the real
 integration smoke) → #17 wiring → #18 docs.
 
+## M10 — PR #22 merged, Sonar gate fixed, PR #23 green and clean (2026-09-26)
+
+**Expected:** the A5 → #1 → #3 train keeps moving: Ali reviews #22, the Sonar
+Quality Gate stops failing, and #3's PR survives dev moving underneath it.
+
+**Achieved:**
+- **SonarCloud fixed:** the first analysis failed `C Security Rating on New
+  Code` on two `pythonsecurity:S8707` findings (the exporter took its output
+  path from `sys.argv`). The argument is gone entirely — the destination is
+  derived from `__file__` and the output stayed byte-identical (verified by
+  re-running the exporter against the committed file) — plus the duplicated 501
+  literal was hoisted. Re-analysis green on #22 and #23.
+- **dev moved twice mid-flight** (Ali's direct A5 close-out `d5f7775`, then the
+  PR #22 merge `e4994ff`): both docs collisions resolved by keeping *both*
+  partners' PROGRESS entries and taking dev's richer A5 annotation; docx
+  regenerated each time. Ali independently resolved the same collision on #22
+  — merged content matched ours, which is the point of doing it two ways.
+- **PR #22 merged** (`e4994ff`): issue #1 skeleton is on dev.
+- **PR #23** (issue #3) re-verified after syncing the merged dev: 8/8 CI checks
+  + Sonar green, `mergeable=clean`.
+- AI-USAGE M9 disclosure row restored (Ali's resolution on the branch had
+  dropped it — disclosure never optional).
+
+**Evidence:** `e4994ff` (PR #22 merge), PR #23 checks at `821f192`,
+`docs/evidence/23-data-layer-proof.txt`, Sonar analyses for both PRs.
+
+**Next:** Ali reviews #23 → merge → tick D1–D4 → issue #4 triage providers
+(always-raise → 201 `rules:fallback` is the non-negotiable test) → #5, #6, #10.
+
 <!-- New entries above this line. -->
