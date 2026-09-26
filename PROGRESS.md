@@ -530,4 +530,47 @@ THE RULE artifacts with the milestone.
 commit-share recompute, README API table, RUNBOOK triage section, demo
 video, dev -> main.
 
+## M16 - #25/#26 merged per Ali's rule, CD gate exposed red, hotfix = PR #30, A4 ticked (2026-09-26)
+
+**Expected:** execute Ali's merge instruction exactly (merge #25 first, then
+sync/merge #26, merge commits never squash, watch for the ci.skip anomaly),
+then keep going until every open defect is fixed.
+
+**Achieved:**
+- **#25 merged `3c9ee7e`, #26 merged `1f5470b` - both merge commits**, in
+  that order; no squash, no history duplication (#26 already contained
+  #25's commits). #26's preconditions were verified before merging: #25 on
+  dev, all 8 checks green on the tip `857fdc1` (run 36267113413's lineage),
+  no `push.pushOption ci.skip` configured. **No ci.skip anomaly**: every
+  push produced a run within ~2 minutes.
+- **Post-merge dev CI green** (run 36267110824) - but **dev CD went red**
+  (run 36267110631): the `test (gate)` backend step ran for the first time
+  in its life (its `hashFiles('backend/pyproject.toml')` guard only became
+  true when #26 landed) and died on `pip install -e ".[dev]"`, which cannot
+  work by design - pyproject is tool config only, and the CD copy had
+  neither CI's `|| requirements.txt` fallback nor its Postgres/Redis
+  services. **Issue #29** documents it; **PR #30** mirrors ci.yml's
+  test-backend byte-for-byte in behaviour (services, env, install recipe,
+  warm-up, coverage gate; timeout 10 -> 15 min). dev CD stays blocked
+  (`needs: test`) until #30 merges.
+- **docs branch (#28) synced with post-#26 dev** via merge commit
+  `9e17a54`; the four append conflicts (PROGRESS M13/M14 vs M15, AI-USAGE
+  rows, checklist D/F4 blocks, binary docx) resolved by keeping both sides
+  + union of ticks, docx regenerated; **8/8 green**, and all **84**
+  `file:line` refs re-verified against the merged tree (0 bad).
+- **A4 ticked**: 87 commits on dev, Ashar 46 (52.9%) / Ali 41 (47.1%) -
+  both ≥35, both ≥35%.
+- Ali's non-blocking entrypoint-trim suggestion answered with the ordering
+  gap it has (seed runs pre-lifespan, so deleting the alembic line breaks
+  fresh-DB seeding silently) and two correct shapes (a: seed self-migrates;
+  b: seed moves into the lifespan), asked which he wants.
+
+**Evidence:** CD red run 36267110631 + green CI 36267110824 on the same
+SHA; issue #29; PR #30; PR #28 checks 8/8 at `9e17a54`; `git shortlog -sn
+origin/dev`.
+
+**Next:** Ali's +1 on #30 (unblocks CD), #28, #27 → then entrypoint trim
+follow-up, A1/A2/A3 evidence pass with Ali, README API table + RUNBOOK
+triage section, demo video, dev -> main.
+
 <!-- New entries above this line. -->
