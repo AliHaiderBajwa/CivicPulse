@@ -15,6 +15,8 @@ from app.schemas import (
 
 router = APIRouter(prefix="/api")
 
+_STUB = "Not implemented yet — issue #5"
+
 _FIELD_ERRORS = {"model": ValidationError}
 _NOT_FOUND = {"model": Error, "description": "No complaint with that id"}
 _CONFLICT = {
@@ -39,7 +41,7 @@ _RATE_LIMITED = {
     responses={400: _FIELD_ERRORS, 429: _RATE_LIMITED},
 )
 def create_complaint(body: ComplaintCreate) -> Complaint:
-    raise HTTPException(status_code=501, detail="Not implemented yet — issue #5")
+    raise HTTPException(status_code=501, detail=_STUB)
 
 
 @router.get(
@@ -56,7 +58,7 @@ def list_complaints(
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=100)] = 20,
 ) -> ComplaintPage:
-    raise HTTPException(status_code=501, detail="Not implemented yet — issue #5")
+    raise HTTPException(status_code=501, detail=_STUB)
 
 
 @router.get(
@@ -66,7 +68,7 @@ def list_complaints(
     responses={404: _NOT_FOUND},
 )
 def get_complaint(id: UUID) -> Complaint:
-    raise HTTPException(status_code=501, detail="Not implemented yet — issue #5")
+    raise HTTPException(status_code=501, detail=_STUB)
 
 
 @router.patch(
@@ -77,4 +79,4 @@ def get_complaint(id: UUID) -> Complaint:
     responses={400: _FIELD_ERRORS, 404: _NOT_FOUND, 409: _CONFLICT},
 )
 def update_complaint_status(id: UUID, body: StatusUpdate) -> Complaint:
-    raise HTTPException(status_code=501, detail="Not implemented yet — issue #5")
+    raise HTTPException(status_code=501, detail=_STUB)
