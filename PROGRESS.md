@@ -384,4 +384,50 @@ gets proven rather than asserted, and the compose AOF gets pointed at.
 along per Ali) → then #10 test suite (activates CI's real jobs), #17
 /metrics wiring + X-Forwarded-For note for Ali, #18 docs/ADRs.
 
+## M13 — Issue #10: test suite + CI activation (Ashar + AI agent)
+
+**Expected:** ≥14 deterministic backend tests with coverage ≥65% and no
+`time.sleep()`; activate CI's lint-and-type / test-backend / integration jobs
+(their trigger is `backend/pyproject.toml`) without letting a red required
+check land on `dev`.
+
+**Achieved:**
+- **`backend/tests/` — 76 tests across 14 files** (guide target 14): state
+  machine (21), API behaviour incl. field-level 400s, 404/409 wording,
+  pagination and `X-Request-ID` echo (9), LLM provider: malformed output not
+  retried, 400 never retried, one retry on timeout/429/5xx (11), injection
+  guardrail (2), rules table (9), cache MISS→HIT + duplicate-text served by
+  one provider call + fallback never cached (5), redaction (5), `/ready` with
+  dead Postgres and dead Redis (3), rate limit + per-client `X-Forwarded-For`
+  window (2), meta+factory (3), metrics (2), JSON logging (2), seed
+  idempotence (1), and the assignment's required provider-failure → 201
+  `rules:fallback` (1). **Coverage 91.90%** (gate 65%); **five consecutive
+  full runs, 76 passed each time, zero flakes**; no `time.sleep` anywhere
+  (LLM jitter injected as `sleep=lambda s: None`).
+- **CI simulated before push, not hoped for:** a throwaway venv ran CI's
+  exact install sequence — `pip install -e .` fails by design (tool-only
+  pyproject) → `requirements.txt` fallback fires; `pytest pytest-cov httpx`
+  only, **fakeredis absent** → conftest falls back to CI's real Redis service
+  container; `DATABASE_URL` without `_test` + `GITHUB_ACTIONS=true` exercises
+  the CI branch of the guard, while a local run against the dev DB is refused
+  (exit 2) before any fixture executes.
+- **Migrate-on-boot:** the integration job does `docker compose up` on an
+  *empty* database with no manual migration step — `backend/entrypoint.sh`
+  now runs `alembic upgrade head` (+ idempotent seed) and `exec`s uvicorn so
+  PID 1 and the SIGTERM drain stay intact; invoked via `sh` so the
+  bind-mounted checkout never needs an exec bit; `.gitattributes` pins
+  `*.sh` to LF (a CRLF shebang fails at container start).
+- **Integration sequence executed against a real stack:** four services
+  healthy on a fresh DB, X-Cache MISS→HIT, POST 201 with enum-validated
+  category, GET-by-id assertion OK; torn down with `down -v`.
+- ruff (new `pyproject` config: E,F,I,B,UP @ 100 columns) and mypy
+  (`check_untyped_defs`) both green; OpenAPI export byte-identical.
+
+**Evidence:** `docs/evidence/27-test-suite.txt` (gates, 5× determinism, CI-venv
+simulation, guard refusal, integration summary, test inventory); commit
+`75376bd`.
+
+**Next:** push + PR `Closes #10` (stacked on PR #25) → #17 (/metrics wiring,
+XFF note for Ali, F4 hit-rate script) → #18 docs/ADRs.
+
 <!-- New entries above this line. -->

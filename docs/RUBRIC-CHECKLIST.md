@@ -23,7 +23,7 @@ One box per rubric line. Tick only when **evidence exists** (code, screenshot, l
 - [x] C4 /health and /ready correctly distinguished; /health does not touch the database — 3 (evidence/25 §11: dead DB → /health 200, /ready 503 degraded)
 - [x] C5 structured JSON logging to stdout with propagated request_id — 3
 - [x] C6 SIGTERM handled: in-flight requests drain before exit — 2 (evidence/26 §3: SIGTERM at +0.7s, in-flight POST finished 201 at 5.2s, pools closed after, exit=0)
-- [ ] C7 ≥14 backend tests, unit and integration, deterministic, coverage ≥65% — 3
+- [x] C7 ≥14 backend tests, unit and integration, deterministic, coverage ≥65% — 3 (76 tests across 14 files, 91.90% coverage, five consecutive zero-flake runs, CI-environment simulation with fakeredis absent; evidence/27)
 
 ## D · Data layer — 12
 - [ ] D1 Alembic migrations; zero schema DDL in application startup code — 4
