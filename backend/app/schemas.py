@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.domain import Category, Priority, Status
 
-TriagedBy = Literal["llm:groq", "llm:ollama", "rules", "rules:fallback"]
+TriagedBy = Literal["llm:groq", "llm:ollama", "rules", "rules:fallback", "simulated"]
 
 
 class ComplaintCreate(BaseModel):

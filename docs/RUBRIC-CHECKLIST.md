@@ -21,7 +21,7 @@ One box per rubric line. Tick only when **evidence exists** (code, screenshot, l
 - [ ] C2 four-layer separation: no SQL outside repositories, no business rules in routes — 4
 - [ ] C3 status state machine as explicit transition table; invalid transitions 409 — 3
 - [ ] C4 /health and /ready correctly distinguished; /health does not touch the database — 3
-- [ ] C5 structured JSON logging to stdout with propagated request_id — 3
+- [x] C5 structured JSON logging to stdout with propagated request_id — 3
 - [ ] C6 SIGTERM handled: in-flight requests drain before exit — 2
 - [ ] C7 ≥14 backend tests, unit and integration, deterministic, coverage ≥65% — 3
 
