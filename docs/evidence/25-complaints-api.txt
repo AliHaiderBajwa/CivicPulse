@@ -179,3 +179,38 @@ GET :8001/ready  -> 503
 {"status":"degraded","dependencies":{"postgres":false,"redis":true}}
 => dead DB takes the pod out of rotation (503) but never restarts it (200).
 ================================================================================
+
+================================================================================
+[12] FRESH-DATABASE LIFESPAN MIGRATION (review response, PR #25)
+
+Ali's blocking review: nothing migrated a fresh database on this branch.
+Fix: lifespan now runs `alembic upgrade head` (via asyncio.to_thread) BEFORE
+serving; alembic.ini uses %(here)s so it is cwd-independent, env.py reads
+DATABASE_URL from the environment => same code path in compose, kind/CD and
+scripts/k8s-up.sh with zero infra changes. Concurrency comment added: two
+replicas racing an empty DB is benign (transactional DDL -> loser aborts,
+restart retries, then no-ops at head).
+
+Proof on a brand-new empty database (no manual alembic, no entrypoint):
+
+$ docker exec cp-pg psql -U civicpulse -d postgres -c "CREATE DATABASE civicpulse_fresh;"
+$ psql -d civicpulse_fresh -c "\dt"
+Did not find any relations.                  # empty, exactly like fresh kind/CD
+
+$ uvicorn app.main:app --port 8911           # DATABASE_URL=.../civicpulse_fresh
+{"level":"INFO","logger":"app","message":"startup: migrating database to head"}
+{"level":"INFO","logger":"alembic.runtime.migration","message":"Will assume transactional DDL."}
+{"level":"INFO","logger":"alembic.runtime.migration","message":"Running upgrade  -> 0001, initial schema"}
+{"level":"INFO","logger":"app","message":"startup: database at head"}
+{"level":"INFO","logger":"uvicorn.error","message":"Application startup complete."}
+
+$ curl -X POST :8911/api/complaints -d '{"text":"fresh DB lifespan migration proof",...}'
+HTTP 201 {"id":"d2ce8bbf-...","category":"other","priority":"normal","triaged_by":"rules",...}
+
+$ psql -d civicpulse_fresh -c "select version_num from alembic_version;" -c "select id from complaints;"
+ version_num | 0001
+ id          | d2ce8bbf-4854-498c-b874-3f39880d5d57
+
+Gates after the change: ruff 0, mypy 0 (39 files), OpenAPI export byte-identical
+(8 paths), import OK.
+================================================================================
