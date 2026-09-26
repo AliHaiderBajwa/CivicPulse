@@ -26,7 +26,7 @@ class RuleBasedTriage:
     name = "rules"
 
     # `location` is unused here but is part of the TriageProvider interface.
-    def triage(self, text: str, location: str) -> TriageResult:  # NOSONAR(python:S1172)
+    def triage(self, text: str, location: str) -> TriageResult:  # NOSONAR
         t = text.lower()
         scores = {c: sum(1 for k in kws if k in t) for c, kws in _CATEGORY_KEYWORDS.items()}
         category, best = max(scores.items(), key=lambda kv: kv[1])   # ties: first in dict order

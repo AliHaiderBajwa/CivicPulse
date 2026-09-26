@@ -24,7 +24,9 @@ WORKDIR /app
 COPY --from=builder /opt/venv /opt/venv
 COPY --chown=10001:10001 alembic.ini ./
 COPY --chown=10001:10001 alembic ./alembic
-COPY --chown=10001:10001 entrypoint.sh ./
+# Root-owned and read-only for the app user: the boot script must not be
+# modifiable by the runtime user (docker:S6504).
+COPY entrypoint.sh ./
 RUN chmod +x entrypoint.sh
 # Source LAST: code edits don't invalidate the dependency layer above.
 COPY --chown=10001:10001 app ./app

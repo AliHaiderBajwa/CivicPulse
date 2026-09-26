@@ -35,7 +35,6 @@ VALID = {
 @pytest.fixture(scope="session", autouse=True)
 def migrated():
     command.upgrade(Config("alembic.ini"), "head")
-    yield
 
 
 @pytest.fixture(scope="session")
@@ -52,7 +51,6 @@ def clean_tables(backing_redis):
     with get_engine().begin() as conn:
         conn.execute(text("TRUNCATE complaints"))
     backing_redis.flushdb()
-    yield
 
 
 @pytest.fixture

@@ -25,7 +25,8 @@ def test_triage_cache_serves_duplicates(client):
     app.dependency_overrides[get_provider] = lambda: provider
     first = client.post("/api/complaints", json=VALID)
     second = client.post("/api/complaints", json=VALID)
-    assert first.status_code == 201 and second.status_code == 201
+    assert first.status_code == 201
+    assert second.status_code == 201
     assert provider.calls == 1  # identical text: one provider call, one cache hit
     assert first.json()["triaged_by"] == "simulated"
     assert second.json()["triaged_by"] == "simulated"

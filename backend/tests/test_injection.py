@@ -27,7 +27,8 @@ def test_injection_cannot_choose_the_category(client):
     assert body["category"] == "water"  # decided by the rules, not by the attack
     assert body["priority"] == "high"
     user_message = fake.last_messages[1]["content"]
-    assert user_message.startswith("<complaint>") and ATTACK in user_message  # delimited data
+    assert user_message.startswith("<complaint>")
+    assert ATTACK in user_message  # sent as delimited data
 
 
 def test_attack_text_is_sent_as_data_not_instructions(client):
