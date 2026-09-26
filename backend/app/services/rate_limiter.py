@@ -16,6 +16,6 @@ class RateLimiter:
     def check(self, client_id: str) -> Decision:
         result = self._cache.incr_window(f"ratelimit:complaints:{client_id}", self._window)
         if result is None:
-            return Decision(True)              # fail open: an outage of the limiter must not take down intake
+            return Decision(True)  # fail open: limiter outage must not take down intake
         count, ttl = result
         return Decision(count <= self._limit, retry_after=ttl)

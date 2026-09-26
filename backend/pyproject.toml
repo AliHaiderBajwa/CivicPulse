@@ -1,0 +1,32 @@
+# Tool configuration ONLY — deliberately no [project] or [build-system] table:
+# CI runs `pip install -e . || pip install -r requirements.txt`; with no project
+# metadata the editable install fails on purpose and the pinned requirements
+# file is used. Runtime dependencies live in requirements.txt alone.
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "--cov=app --cov-report=term-missing --cov-fail-under=65"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+# The test database guard must run before the app imports.
+"tests/conftest.py" = ["E402"]
+"alembic/*" = ["E402"]
+# Seed texts are verbatim complaint content: line length is a data property,
+# and re-wrapping would change the uuid5-derived stable ids.
+"app/seed_data.py" = ["E501"]
+# (str, Enum) is the pydantic-v2 convention; StrEnum would change str(enum)
+# output that other layers may rely on — style must not risk the contract.
+"app/domain.py" = ["UP042"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+check_untyped_defs = true

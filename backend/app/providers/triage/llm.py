@@ -33,12 +33,13 @@ def parse_triage(raw: str) -> TriageResult:
     """Never trust model output: validate it against the same Pydantic model as everything else."""
     try:
         return TriageResult.model_validate_json(raw)
-    except ValidationError as exc:              # prose, code fence, unknown category, 400-char summary...
+    except ValidationError as exc:         # prose, code fence, bad enum, over-long summary
         raise ProviderError("model returned invalid triage output") from exc
 
 
 def is_retryable(exc: Exception) -> bool:
-    """Timeout, connection trouble, 429 and 5xx are retryable. A 400/401 is not: it will fail again."""
+    """Timeout, connection trouble, 429 and 5xx are retryable.
+    A 400/401 is not: it will fail again."""
     if isinstance(exc, (TimeoutError, APITimeoutError, APIConnectionError)):
         return True
     status = getattr(exc, "status_code", None)     # duck-typed so tests can use a tiny fake error
@@ -72,8 +73,8 @@ class LLMTriage:
                 raw = self._call(text)
             except Exception as exc:
                 if attempt == 1 and is_retryable(exc):
-                    self._sleep(random.uniform(*self._jitter))    # jitter avoids synchronized retries
+                    self._sleep(random.uniform(*self._jitter))  # jitter de-synchronizes
                     continue
                 raise ProviderError(type(exc).__name__) from exc
-            return parse_triage(raw)               # bad output is NOT retried; it goes to the fallback
+            return parse_triage(raw)        # not retried: bad output goes to the fallback
         raise ProviderError("unreachable")         # keeps mypy happy

@@ -13,5 +13,6 @@ def redact(text: str) -> str:
     # the scan entirely (keeps hostile @-less input linear).
     if "@" in text:
         text = _EMAIL.sub("[email]", text)
-    text = _CNIC.sub("[id]", text)         # before phone: a CNIC is 13 digits and would match the phone rule
+    # CNIC before phone: a CNIC is 13 digits and would match the phone rule.
+    text = _CNIC.sub("[id]", text)
     return _PHONE.sub("[phone]", text)

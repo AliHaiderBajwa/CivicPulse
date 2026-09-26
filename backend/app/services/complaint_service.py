@@ -12,7 +12,9 @@ log = logging.getLogger("app.complaints")
 
 
 class ComplaintService:
-    def __init__(self, repo: ComplaintRepository, triage: TriageOrchestrator, stats: StatsService) -> None:
+    def __init__(
+        self, repo: ComplaintRepository, triage: TriageOrchestrator, stats: StatsService
+    ) -> None:
         self._repo, self._triage, self._stats = repo, triage, stats
 
     def create(self, data: ComplaintCreate) -> Complaint:
@@ -24,7 +26,7 @@ class ComplaintService:
             triage_latency_ms=outcome.latency_ms,
         )
         self._repo.commit()
-        self._stats.invalidate()                       # a new complaint must show in stats immediately
+        self._stats.invalidate()  # a new complaint must show in stats immediately
         if outcome.fallback:                           # exactly one WARNING per fallback
             log.warning("triage fallback", extra={
                 "complaint_id": str(complaint.id),

@@ -44,11 +44,13 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False,
                   server_default=sa.text("now()")),
         sa.CheckConstraint("char_length(text) BETWEEN 10 AND 2000", name="ck_complaints_text_len"),
-        sa.CheckConstraint("char_length(location) BETWEEN 3 AND 200", name="ck_complaints_location_len"),
+        sa.CheckConstraint("char_length(location) BETWEEN 3 AND 200",
+                           name="ck_complaints_location_len"),
         sa.CheckConstraint("ai_summary IS NULL OR char_length(ai_summary) <= 140",
                            name="ck_complaints_summary_len"),
-        sa.CheckConstraint("triaged_by IN ('llm:groq','llm:ollama','rules','rules:fallback','simulated')",
-                           name="ck_complaints_triaged_by"),
+        sa.CheckConstraint(
+            "triaged_by IN ('llm:groq','llm:ollama','rules','rules:fallback','simulated')",
+            name="ck_complaints_triaged_by"),
     )
     # (status, priority): serves the dashboard filter "WHERE status = ? AND priority = ?"
     # and the stats GROUP BY status / priority.

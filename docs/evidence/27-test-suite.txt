@@ -1,0 +1,63 @@
+=== 1. ruff check . (CI's exact command, new pyproject config) ===
+All checks passed!
+exit 0 - All checks passed
+
+=== 2. mypy app (CI's exact args) ===
+Success: no issues found in 39 source files
+
+=== 3. openapi exporter (contract must stay byte-identical) ===
+wrote D:\University Assignments\SCD A1\CivicPulse\docs\openapi.json (8 paths)
+docs/openapi.json: no diff (CONTRACT UNCHANGED)
+
+=== 4. full suite with coverage (CI's pytest flags) ===
+app\services\stats_service.py                 22      0   100%
+app\services\triage_orchestrator.py           64      2    97%   55-56
+------------------------------------------------------------------------
+TOTAL                                        852     69    92%
+Required test coverage of 65% reached. Total coverage: 91.90%
+76 passed in 8.38s
+
+=== 5. determinism: five consecutive full runs (guide requires 5x, zero flakiness) ===
+run 1/5: 76 passed in 4.42s (exit 0)
+run 2/5: 76 passed in 3.94s (exit 0)
+run 3/5: 76 passed in 4.56s (exit 0)
+run 4/5: 76 passed in 4.32s (exit 0)
+run 5/5: 76 passed in 4.68s (exit 0)
+
+=== 6. CI environment simulation: throwaway venv with EXACTLY CI's installs ===
+pip install -e backend  -> exit 1 (setuptools: 'Multiple top-level packages discovered'),
+pip install -r requirements.txt -> exit 0 (CI's '||' fallback fires as designed)
+pip install pytest pytest-cov httpx -> exit 0; fakeredis deliberately ABSENT:
+fakeredis installed: False
+
+CI's test sequence in that venv, DATABASE_URL WITHOUT _test suffix + GITHUB_ACTIONS=true
+(exercises the CI branch of the conftest guard; disposable DB civicpulse_ci):
+alembic upgrade head: exit 0
+seed: inserted 0, skipped 34 (already present) (exit 0)
+------------------------------------------------------------------------
+TOTAL                                        852     67    92%
+Required test coverage of 65% reached. Total coverage: 92.14%
+76 passed in 5.25s
+pytest exit: 0
+
+=== 7. local guard: DATABASE_URL without _test and no GITHUB_ACTIONS must refuse ===
+    pytest.exit("DATABASE_URL must point at a database whose name ends in _test", returncode=2)
+E   _pytest.outcomes.Exit: DATABASE_URL must point at a database whose name ends in _test
+pytest exit: -1
+
+=== 8. integration job sequence (ci.yml lines 230-249) run against a real compose stack ===
+cp .env.example .env; docker compose up -d --wait -> all four services healthy
+  (backend health went green only after entrypoint.sh ran 'alembic upgrade head'
+   on a FRESH empty database - the real CI path has no manual migration step)
+first stats request: X-Cache MISS, second: HIT
+POST /api/complaints -> 201 {"category":"water","triaged_by":"simulated"} (enum-validated by jq)
+GET  /api/complaints/<id> -> id matches (assertion OK)
+INTEGRATION SMOKE OK; teardown: docker compose down -v + .env removed
+
+=== 9. test inventory (pytest --collect-only, per file) ===
+76 tests across 14 files:
+  test_domain(21) test_api(9) test_rules(9) test_llm_provider(11) test_cache(5)
+  test_redaction(5) test_health(3) test_meta(3) test_injection(2) test_logging(2)
+  test_metrics(2) test_ratelimit(2) test_fallback(1) test_seed(1)
+coverage 91.90% (gate 65%): no file below 75% except unexecuted seed __main__ branches
+guidance targets: 14+ tests, >=65% coverage, deterministic, no time.sleep - met with 76/91.9%/0 flakes

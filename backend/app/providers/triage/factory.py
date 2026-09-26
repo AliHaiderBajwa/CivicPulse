@@ -15,10 +15,14 @@ def build_provider(s: Settings) -> TriageProvider:
     elif s.triage_provider == "simulated":
         provider = SimulatedTriage(s.simulated_fail_mode, s.simulated_delay_s)
     elif s.triage_provider == "ollama":
-        client = OpenAI(api_key="ollama", base_url=s.ollama_url, timeout=s.llm_timeout_s, max_retries=0)
+        client = OpenAI(
+            api_key="ollama", base_url=s.ollama_url, timeout=s.llm_timeout_s, max_retries=0
+        )
         provider = OllamaTriage(client=client, model=s.ollama_model)
     else:
-        client = OpenAI(api_key=s.llm_api_key.get_secret_value() or "missing", base_url=s.llm_base_url,
-                        timeout=s.llm_timeout_s, max_retries=0)
+        client = OpenAI(
+            api_key=s.llm_api_key.get_secret_value() or "missing",
+            base_url=s.llm_base_url, timeout=s.llm_timeout_s, max_retries=0,
+        )
         provider = LLMTriage(client=client, model=s.llm_model, name=s.llm_label)
     return provider

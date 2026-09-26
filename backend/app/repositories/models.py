@@ -26,8 +26,10 @@ class Complaint(Base):
     text: Mapped[str] = mapped_column(Text, nullable=False)
     location: Mapped[str] = mapped_column(String(200), nullable=False)
     reporter_contact: Mapped[str | None] = mapped_column(String(200))
-    category: Mapped[Category] = mapped_column(_enum(Category, "complaint_category"), nullable=False)
-    priority: Mapped[Priority] = mapped_column(_enum(Priority, "complaint_priority"), nullable=False)
+    category: Mapped[Category] = mapped_column(
+        _enum(Category, "complaint_category"), nullable=False)
+    priority: Mapped[Priority] = mapped_column(
+        _enum(Priority, "complaint_priority"), nullable=False)
     status: Mapped[Status] = mapped_column(_enum(Status, "complaint_status"), nullable=False,
                                            server_default="open")
     ai_summary: Mapped[str | None] = mapped_column(String(140))

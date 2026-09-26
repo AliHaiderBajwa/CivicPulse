@@ -2,7 +2,8 @@ from app.domain import Category, Priority
 from app.providers.triage.base import TriageResult
 
 _CATEGORY_KEYWORDS: dict[Category, tuple[str, ...]] = {
-    Category.WATER: ("water", "pani", "paani", "pipe", "leak", "tanker", "tap ", "tubewell", "flood"),
+    Category.WATER: ("water", "pani", "paani", "pipe", "leak", "tanker",
+                     "tap ", "tubewell", "flood"),
     Category.ELECTRICITY: ("electric", "bijli", "power", "voltage", "transformer", "wire",
                            "meter", "load shedding", "loadshedding", "outage", "spark"),
     Category.SANITATION: ("sewage", "sewerage", "gutter", "nali", "drain", "kachra", "garbage",
