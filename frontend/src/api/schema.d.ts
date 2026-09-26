@@ -173,7 +173,7 @@ export interface components {
              * @description Which provider decided this triage
              * @enum {string}
              */
-            triaged_by: "llm:groq" | "llm:ollama" | "rules" | "rules:fallback";
+            triaged_by: "llm:groq" | "llm:ollama" | "rules" | "rules:fallback" | "simulated";
             /** Triage Latency Ms */
             triage_latency_ms: number;
             /**
