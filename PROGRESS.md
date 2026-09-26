@@ -350,4 +350,38 @@ with enough evidence to tick the C/E/F boxes this batch actually earns.
 (E4) → push, PR `Closes #5, Closes #6` (Dockerfile rides along per Ali's
 ruling) → then #10 test suite, #17, #18 docs.
 
+## M12 — backend image + SIGTERM drain + AOF verified, G/C6/E4 boxes ticked (2026-09-26)
+
+**Expected:** the #5+#6 PR gets its image (Ali's ruling: Dockerfile lands with
+working endpoints, and the endpoints are done), the graceful-shutdown claim
+gets proven rather than asserted, and the compose AOF gets pointed at.
+
+**Achieved:**
+- **`backend/Dockerfile`** (multi-stage, `python:3.12.13-slim-bookworm` exact
+  patch tag, deps layer before source, numeric `USER 10001:10001`, exec-form
+  CMD with `--timeout-graceful-shutdown 20`, urllib HEALTHCHECK) +
+  `.dockerignore`. Cold `--no-cache` build exit 0; image 74.1 MB.
+- **Context sizes reported both ways, both images** (G2): backend 48 files /
+  0.07 MB with ignore vs 8129 / 195.72 MB without (149 MB = `.venv`);
+  frontend 19 / 0.21 MB vs 9476 / 110.5 MB. A fresh `buildx` builder gave a
+  truthful cold transfer line (175.34 kB) because repeat builds show
+  BuildKit's incremental near-empty line — noted in the evidence, not hidden.
+- **SIGTERM drain proven live (C6):** POST fired, SIGTERM 0.7 s later,
+  uvicorn "Waiting for connections to close", the request **completed 201 at
+  5.22 s** (`duration_ms=5218.9`), then `shutdown: closing connection pools`
+  and clean `exit=0`. `docker stop` took 5.4 s. K8s note recorded for Ali:
+  `terminationGracePeriodSeconds >= 30`.
+- **E4:** compose already carries `--appendonly yes` on the named `redisdata`
+  volume with the rationale comment at `compose.yaml:101-102` — ticked with a
+  pointer instead of re-doing finished work.
+- **4 more boxes:** C6, E4, G1, G2 (16 total ticked this session across
+  M11+M12).
+
+**Evidence:** `docs/evidence/26-backend-image-drain-aof.txt`; commits
+`e6c5691` (M11 docs), `4d35bb2` (image + evidence 26).
+
+**Next:** push the branch, open PR `Closes #5, Closes #6` (Dockerfile rides
+along per Ali) → then #10 test suite (activates CI's real jobs), #17
+/metrics wiring + X-Forwarded-For note for Ali, #18 docs/ADRs.
+
 <!-- New entries above this line. -->
