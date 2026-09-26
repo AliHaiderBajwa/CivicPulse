@@ -231,4 +231,42 @@ commit `c37ef00`, PR #21 (open, checks green).
 **Next:** Ashar reviews #21 → merge → tick A5, close #19 → continue J-block
 (ADRs, RUNBOOK, ENGINEERING-NOTES) and `scripts/check_submission.py`.
 
+## M9 — A5 ticked, Ashar's environment stood up, issue #1 skeleton = PR #22 (2026-09-26)
+
+**Expected:** Ashar closes out A5 by reviewing #21, brings up his local toolchain
+from a cold start, then implements issue #1 per `Ashar_Track` Step 1 and ships it
+as a reviewable PR.
+
+**Achieved:**
+- **A5 closed:** reviewed PR #21 as `@ashar1x` with a verified (not rubber-stamped)
+  review — confirmed `c37ef00` is a true two-parent merge (`0a69916` + `7c5de58`),
+  markers captured pre-staging, net `compose.yaml` diff vs dev is zero because the
+  resolution adopts the already-reviewed 5s — approved and merged `4e1d80d`.
+  **A5 ticked.**
+- **Environment:** Docker Desktop started; uv-managed CPython 3.12.13 →
+  `backend/.venv`; 34 runtime + 21 dev dependencies pinned in
+  `backend/requirements{,-dev}.txt`; dev Postgres 16 + Redis 7 containers on
+  loopback with a separate `civicpulse_test` database; assignment PDF re-extracted
+  (pypdf, 26 pages) and diffed against `docs/`-adjacent `SCDA1.md` — no content
+  delta (the PDF genuinely has no §5.6).
+- **Issue #1 (PR #22):** all nine endpoints with the frozen contract's operationIds;
+  contract-named Pydantic schemas so `npm run gen:api` output keeps `client.ts`
+  compiling; deterministic idempotent exporter that drops FastAPI's phantom 422
+  (runtime is 400 via `routes/errors.py`) and forces the contract-shaped
+  `ValidationError` before FastAPI's same-named internal model can win the
+  collision; field-level 400s; JSON stdout logs carrying `request_id`;
+  request-context middleware (`x-request-id` in, Prometheus HTTP metrics out);
+  `/health` real, `/metrics` live, `/ready` + complaint bodies 501 until #4–#6.
+- **Local gates:** `ruff check .` clean, `mypy app --ignore-missing-imports`
+  clean, exporter hash-stable across runs, `tsc --noEmit` green after
+  `gen:api`, vitest 15/15.
+
+**Evidence:** PR #20 (merged `7c5de58`), PR #21 (merged `4e1d80d`, my approving
+review on record), PR #22 (open), commits `08ee4d3..c84662e`.
+
+**Next:** #3 Alembic migration + idempotent seed → #4 triage providers (incl.
+always-raise → 201 `rules:fallback`) → #5 complaint API/state machine → #6 Redis
+cache + limiter → #10 suite (the PR that activates `test-backend` and the real
+integration smoke) → #17 wiring → #18 docs.
+
 <!-- New entries above this line. -->

@@ -7,7 +7,7 @@ One box per rubric line. Tick only when **evidence exists** (code, screenshot, l
 - [ ] A2 two-branch model (dev + feature branches); no work committed directly to main — 2
 - [ ] A3 ≥5 merged PRs, each linked to an Issue, each with a substantive review comment from partner — 4
 - [ ] A4 ≥35 commits, conventional prefixes, neither partner below 35% (git shortlog -sn) — 3
-- [ ] A5 one deliberate merge conflict on real code, resolved, with markers/resolution/merge evidence + 2–4 sentences on why that version won — 3
+- [x] A5 one deliberate merge conflict on real code, resolved, with markers/resolution/merge evidence + 2–4 sentences on why that version won — 3
 
 ## B · Frontend — 18
 - [x] B1 Submit view: validation, honest loading state, renders category, priority, AI summary and provider — 5
