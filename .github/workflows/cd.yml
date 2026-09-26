@@ -24,9 +24,40 @@ jobs:
   test:
     name: test (gate)
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     permissions:
       contents: read
+    # Same disposable services as ci.yml's test-backend: the suite needs a
+    # real Postgres and Redis (conftest's guard admits CI's suffix-less DB).
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: civicpulse
+          POSTGRES_PASSWORD: civicpulse
+          POSTGRES_DB: civicpulse
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql+psycopg://civicpulse:civicpulse@localhost:5432/civicpulse
+      REDIS_URL: redis://localhost:6379/0
+      TRIAGE_PROVIDER: simulated
+      RATE_LIMIT_PER_MIN: "1000"
+      LOG_LEVEL: INFO
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -36,13 +67,21 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Backend suite (skipped until backend/ lands)
+      - name: Backend suite
         if: hashFiles('backend/pyproject.toml') != ''
         run: |
           set -euo pipefail
+          # Mirrors ci.yml test-backend byte-for-byte in behaviour: pyproject is
+          # tool-config only (no [project] table), so the editable install fails
+          # on purpose and requirements.txt is the real dependency source. This
+          # step had never executed before PR #26 landed the guard file - its
+          # first live run on dev was red (pip install -e ".[dev]" cannot work).
+          python -m pip install --quiet -e backend || python -m pip install --quiet -r backend/requirements.txt
+          python -m pip install --quiet pytest pytest-cov httpx
           cd backend
-          pip install -e ".[dev]"
-          TRIAGE_PROVIDER=simulated pytest --cov=app --cov-fail-under=65 -q
+          alembic upgrade head || true
+          python -m app.seed || true
+          pytest --cov=app --cov-fail-under=65 -q
 
       - name: Frontend suite
         run: |
