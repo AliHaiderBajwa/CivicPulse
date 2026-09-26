@@ -1,0 +1,161 @@
+================================================================================
+EVIDENCE 25 — complaints/stat/stats/meta/health routes end-to-end (issue #5+#6)
+Ashar session + opencode, 2026-09-26
+Branch: feat/complaints-api (stacked on feat/triage-providers + feat/db-migrations-seed)
+Local stack: cp-pg (postgres:16, seeded 34), cp-redis (redis:7)
+Server: uvicorn app.main:app 127.0.0.1:8000, TRIAGE_PROVIDER=simulated,
+        RATE_LIMIT_PER_MIN=3 (rate-limit demo) / 100 (fallback demo)
+================================================================================
+
+[1] STATIC GATES  (backend/ cwd)
+
+$ .venv\Scripts\ruff.exe check .
+All checks passed!            -> ruff=0
+
+$ .venv\Scripts\mypy.exe app --ignore-missing-imports
+Success: no issues found in 39 source files    -> mypy=0
+
+$ .venv\Scripts\python.exe -m app.export_openapi
+wrote docs/openapi.json (8 paths)
+$ git diff --name-only -- docs/openapi.json
+(empty)                      -> CONTRACT UNCHANGED after implementing all routes
+                               (response models, operationIds, statuses, 429
+                               Retry-After header, descriptions all identical)
+
+================================================================================
+[2] CORE ROUTES — full transcript: temp:api-suite.txt
+    (server freshly started; seed total before = 34)
+
+POST /api/complaints  {text, location}                              -> 201
+HTTP/1.1 201 Created
+x-request-id: 889c9cda25484849856f5d038e4970cb
+{"id":"c652ce52-...","text":"Deep pothole crack on Main Street near the bus stop",
+ "location":"Main Street","category":"roads","priority":"normal","status":"open",
+ "triaged_by":"simulated","triage_latency_ms":2}          # category derived by triage
+
+POST /api/complaints  {text:"short", location:"x"}                   -> 400
+{"detail":[{"field":"text","message":"String should have at least 10 characters"},
+           {"field":"location","message":"String should have at least 3 characters"}]}
+
+GET  /api/stats                                                     -> 200
+x-cache: MISS
+{"total":35,"by_category":{"water":6,"electricity":6,"sanitation":6,"roads":7,
+ "streetlights":6,"other":4},"by_priority":{"high":10,"normal":18,"low":7}}
+GET  /api/stats                                                     -> 200
+x-cache: HIT                # zero-filled buckets, contract shape (no by_status)
+
+GET  /api/complaints?page=1&page_size=5                             -> 200
+{"items":[...5 items...],"total":35,"page":1,"page_size":5}
+
+GET  /api/complaints?category=roads&page_size=3                     -> 200
+{"items":[3 roads items...],"total":7,...}       # filter + seed + created rows
+
+GET  /api/complaints?page=0                                         -> 400
+{"detail":[{"field":"page","message":"Input should be greater than or equal to 1"}]}
+
+GET  /api/complaints/00000000-0000-4000-8000-000000000000          -> 404
+{"detail":"Complaint not found: 00000000-0000-4000-8000-000000000000"}   # verbatim
+
+GET  /api/stats  (after 2nd successful create)                      -> 200
+x-cache: MISS
+{"total":36,...,"streetlights":7,...}            # write invalidated the cache
+
+NOTE: with RATE_LIMIT_PER_MIN=3, requests with a parseable body count toward
+      the window (including validation-400s); malformed JSON is rejected
+      before the limiter runs. Observed: 3 counted requests passed, the 4th
+      was denied.
+
+================================================================================
+[3] RATE LIMIT — focused window (temp:api-suite2.txt), 3 creates then 4th:
+
+POST -> 201 {"id":"81c46183-...","triaged_by":"simulated",...}
+POST -> 201 {"id":"459768bf-...", ...}
+POST -> 201 {"id":"de238914-...", ...}
+POST -> 429 Too Many Requests
+retry-after: 60
+{"detail":"Rate limit exceeded. Try again shortly."}          # + Retry-After header
+
+================================================================================
+[4] STATUS STATE MACHINE
+
+PATCH /api/complaints/{id}/status {"status":"in_progress"}  (open)   -> 200
+{"id":"c652ce52-...","status":"in_progress","updated_at":"...T16:32:21.458397Z"}
+
+PATCH ... {"status":"resolved"}  (current open)                      -> 409
+{"detail":"Invalid status transition: open -> resolved"}   # verbatim contract msg
+
+PATCH ... {"status":"nope"}                                         -> 400
+{"detail":[{"field":"status","message":"Input should be 'open', 'in_progress',
+ 'resolved' or 'rejected'"}]}
+
+PATCH ... {"status":"in_progress"}  (current resolved = terminal)    -> 409
+{"detail":"Invalid status transition: resolved -> in_progress"}
+
+================================================================================
+[5] META PROVIDERS
+
+GET  /api/meta/providers                                             -> 200
+{"active_provider":"simulated",
+ "recent_triages":[{"provider":"simulated","latency_ms":2,"fallback":false,
+                    "complaint_id":null}, ...,
+                   {"provider":"rules:fallback","latency_ms":1,"fallback":true,...}]}
+
+================================================================================
+[6] FALLBACK ON REQUEST PATH (SIMULATED_FAIL_MODE=raise, fresh unique text)
+
+POST /api/complaints                                                 -> 201
+{"id":"01d2a2e4-b59c-4ba8-adc4-b7473a9a9f40",
+ "text":"Brand new unique report about a collapsed storm drain on Kingsway Avenue",
+ "category":"sanitation","priority":"high","status":"open",
+ "triaged_by":"rules:fallback","triage_latency_ms":1}
+           # provider raised ProviderError -> orchestrator fell back to rules,
+           # request still 201 (hard rule: fallback must never fail the request)
+
+WARNING JSON log (single structured line):
+{"ts":"2026-09-26T16:33:34.385428+00:00","level":"WARNING","logger":"app.complaints",
+ "message":"triage fallback","request_id":"408cd69516824b4dbc727203bc2b2895",
+ "complaint_id":"01d2a2e4-b59c-4ba8-adc4-b7473a9a9f40","provider":"simulated",
+ "error_class":"ProviderError"}
+
+Observation: an identical-text request served from the triage content-hash cache
+BEFORE the provider was called (1 ms, no fallback) — cache sits upstream of the
+provider call, as designed.
+
+================================================================================
+[7] HEALTH / READY / METRICS
+
+GET /health  -> 200 {"status":"ok"}                     (no DB/Redis touched)
+GET /ready   -> 200 {"status":"ok","dependencies":{"postgres":true,"redis":true}}
+GET /metrics -> 200 text/plain; version=1.0.0
+  http_requests_total{method="POST",path="/api/complaints",status="201"} 2.0
+  http_requests_total{method="POST",path="/api/complaints",status="429"} 2.0
+  triage_duration_seconds_count{provider="simulated"} 2.0
+  triage_cache_total{result="miss"} 2.0
+  triage_fallback_total  (declared; 0 in this first server instance)
+
+================================================================================
+[8] JSON LOGGING (structured, request_id, no traceback spam)
+
+{"ts":"2026-09-26T16:28:16.847047+00:00","level":"INFO","logger":"app",
+ "message":"startup","request_id":"-"}
+{"ts":"2026-09-26T16:30:20.009980+00:00","level":"INFO","logger":"app.access",
+ "message":"request","request_id":"89835097d4c045e3a909962b6a398e9c",
+ "method":"PATCH","path":"/api/complaints/{id}/status","status":200,
+ "duration_ms":16.4}
+every response also carries x-request-id (echoed from the log's request_id)
+
+================================================================================
+[9] FAILURE MODES EXERCISED (all on the real HTTP surface)
+
+- 400 field-level validation (body + query + path enums)   ...detail[].field path
+- 404 unknown uuid, message verbatim
+- 409 illegal transition x2 (skip-ahead + terminal), message verbatim
+- 429 with Retry-After header after Nth counted request
+- provider exception -> rules:fallback + WARNING, still 201
+- broken text (same content) -> triage cache hit, no provider call
+- X-Cache MISS -> HIT -> MISS(invalidation) on /api/stats
+
+X-Forwarded-For note for nginx/CDN: client_ip() takes the FIRST hop; safe only
+when a trusted proxy overwrites/appends the header. Raise with Ali before the
+K8s ingress lands (issue #17 territory).
+================================================================================
