@@ -28,7 +28,7 @@ One box per rubric line. Tick only when **evidence exists** (code, screenshot, l
 ## D · Data layer — 12
 - [ ] D1 Alembic migrations; zero schema DDL in application startup code — 4
 - [ ] D2 schema complete incl. triaged_by, ai_summary, triage_latency_ms, timestamptz — 3
-- [ ] D3 two indexes, each justified by a named query in notes — 2
+- [x] D3 two indexes, each justified by a named query in notes — 2 (ENGINEERING-NOTES "Reason for each index": `ix_complaints_created_at` ← feed ORDER BY at complaint_repository.py:42; `ix_complaints_status_priority` ← filtered queue at :35-39; schema in evidence/23)
 - [ ] D4 idempotent seed of ≥30 realistic complaints; running twice changes nothing — 3
 
 ## E · Cache layer — 10
@@ -41,10 +41,10 @@ One box per rubric line. Tick only when **evidence exists** (code, screenshot, l
 - [x] F1 TriageProvider interface with ≥3 working implementations selected by env var — 5 (rules/simulated/llm/ollama via TRIAGE_PROVIDER; evidence/24 factory + per-provider checks)
 - [x] F2 structured output requested and validated against Pydantic schema; malformed output rejected safely — 5 (evidence/24: parse_triage rejects bad category/confidence; malformed → ProviderError → fallback, never retried)
 - [x] F3 timeout, single jittered retry on retryable errors only, fallback to rules, triaged_by recorded — 6 (evidence/24: 503 retried once with jitter, 401/400 not retried, timeout retried; evidence/25 §6 rules:fallback + triaged_by)
-- [ ] F4 content-hash caching of triage results with measured, reported hit rate — 3 (mechanism proven in evidence/24 miss→hit + hit counter; still owes the duplicate-submit script + hit-rate number in notes)
+- [x] F4 content-hash caching of triage results with measured, reported hit rate — 3 (`scripts/triage_hit_rate.py` + docs/evidence/28: hit_rate 0.75 = 30 hits/10 misses/40 lookups, two identical runs; reported in docs/TRIAGE.md §3 and ENGINEERING-NOTES "measured cache hit rate"; mechanism in evidence/24)
 - [x] F5 prompt-injection guardrail plus a test submitting an injection attempt — 3 (evidence/24: tag-early injection attempt cannot escape the tag)
 - [x] F6 triage_latency_ms recorded and surfaced through /api/meta/providers — 2 (evidence/25 §5: recent_triages[].latency_ms populated per outcome)
-- [ ] F7 PII/data-governance ADR: what leaves machine, to whom, why acceptable — 1
+- [x] F7 PII/data-governance ADR: what leaves machine, to whom, why acceptable — 1 (docs/adr/0004-pii-and-data-governance.md: per-provider egress table, reporter_contact structurally never passed (complaint_service.py:21), redaction before egress (triage_orchestrator.py:42), SecretStr key)
 
 ## G · Docker and Compose — 15
 - [x] G1 both images multi-stage, pinned base, non-root USER, exec-form CMD, cache-correct layer order — 4 (frontend from M2; backend evidence/26 §1: python:3.12.13-slim-bookworm, USER 10001, venv layer before app COPY, 74.1 MB)

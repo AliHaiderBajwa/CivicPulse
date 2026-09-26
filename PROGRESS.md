@@ -384,4 +384,42 @@ gets proven rather than asserted, and the compose AOF gets pointed at.
 along per Ali) → then #10 test suite (activates CI's real jobs), #17
 /metrics wiring + X-Forwarded-For note for Ali, #18 docs/ADRs.
 
+## M15 - issue #18 docs = PR #28 (TRIAGE.md, ENGINEERING-NOTES, ADR 0001+0004) (2026-09-26)
+
+**Expected:** issue #18's deliverables land while their `file:line` refs are
+still true - TRIAGE.md (providers, JSON/Pydantic path, timeout/retry, cache +
+measured hit rate, guardrail, fallback test + CI link) and my four §5.2
+answers plus the "also required" extras; ADRs 0001 and 0004 per PLAN §7;
+THE RULE artifacts with the milestone.
+
+**Achieved:**
+- PR #28 opened off `origin/dev` with four documents: `docs/TRIAGE.md`
+  (six sections, real CI run link, reproduction command for the hit-rate
+  probe), `docs/ENGINEERING-NOTES.md` (Q4 + Q8 written in full, Q7 Compose
+  confirmation, Ali's Q1/Q2/Q3/Q5/Q6/Q7-write scaffolded with pending
+  markers, plus the index-reasons table, stats TTL+invalidation, `redisdata`
+  justification, honest "not observed live" Groq note, measured hit rate),
+  `docs/adr/0001-provider-interface.md` (structural Protocol vs ABC vs
+  scattered if/elif vs plugins vs framework), `docs/adr/0004-pii-and-data-
+  governance.md` (per-provider egress table, what never leaves structurally).
+- **106/106 `file:line` refs machine-verified** against the final-state tree
+  (`feat/test-suite` content) - six wrong citations caught and fixed before
+  push (test-suite's `complaint_service` is +2 vs dev, redaction's comment
+  block grew, the 429 check is line 46, status-change invalidate is line 54).
+  The PR body states it **must merge after #26** so every ref stays true on
+  `dev`.
+- All four issue-#18 topics (provider interface, retry policy, stats-cache
+  TTL+invalidation, fallback guarantees) are answered somewhere in the four
+  documents.
+- Boxes ticked: **F7** (ADR 0004), **D3** (named-query index reasons),
+  **F4** (script + 0.75 + TRIAGE §3).
+
+**Evidence:** PR #28 (https://github.com/AliHaiderBajwa/CivicPulse/pull/28);
+`docs/evidence/28-metrics-f4.txt` (F4 hit_rate 0.75).
+
+**Next:** Ali on #26/#27 (queue comment already posted); after #26 merges,
+rebase #28 and resolve the PROGRESS/AI-USAGE/checklist append conflicts by
+keeping both sides, then Ali reviews #28. Then A4 commit-share recompute,
+README API table, demo video, dev -> main.
+
 <!-- New entries above this line. -->
