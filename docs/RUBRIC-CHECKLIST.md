@@ -17,10 +17,10 @@ One box per rubric line. Tick only when **evidence exists** (code, screenshot, l
 - [x] B5 ≥5 meaningful component tests passing in CI — 2
 
 ## C · Backend — 25
-- [ ] C1 all endpoints to contract, correct status codes, field-level validation errors — 7
-- [ ] C2 four-layer separation: no SQL outside repositories, no business rules in routes — 4
-- [ ] C3 status state machine as explicit transition table; invalid transitions 409 — 3
-- [ ] C4 /health and /ready correctly distinguished; /health does not touch the database — 3
+- [x] C1 all endpoints to contract, correct status codes, field-level validation errors — 7 (all 8 contract paths exercised; contract diff EMPTY after routes; evidence/25 §2–7)
+- [x] C2 four-layer separation: no SQL outside repositories, no business rules in routes — 4 (evidence/25 §10: only SQL sites are in repositories; routes are HTTP↔service only)
+- [x] C3 status state machine as explicit transition table; invalid transitions 409 — 3 (domain.py TRANSITIONS; evidence/25 §4: 409 verbatim ×2 incl. terminal state)
+- [x] C4 /health and /ready correctly distinguished; /health does not touch the database — 3 (evidence/25 §11: dead DB → /health 200, /ready 503 degraded)
 - [x] C5 structured JSON logging to stdout with propagated request_id — 3
 - [ ] C6 SIGTERM handled: in-flight requests drain before exit — 2
 - [ ] C7 ≥14 backend tests, unit and integration, deterministic, coverage ≥65% — 3
@@ -32,18 +32,18 @@ One box per rubric line. Tick only when **evidence exists** (code, screenshot, l
 - [ ] D4 idempotent seed of ≥30 realistic complaints; running twice changes nothing — 3
 
 ## E · Cache layer — 10
-- [ ] E1 /api/stats read-through cache, 30 s TTL, correct X-Cache header — 3
-- [ ] E2 cache invalidated on write, not left to expire — 2
-- [ ] E3 distributed Redis rate limiter on POST /api/complaints, 429 with Retry-After — 4
+- [x] E1 /api/stats read-through cache, 30 s TTL, correct X-Cache header — 3 (evidence/25 §2: MISS→HIT, stats_ttl_s=30, header on every 200)
+- [x] E2 cache invalidated on write, not left to expire — 2 (evidence/25 §2: MISS immediately after create, before TTL expiry)
+- [x] E3 distributed Redis rate limiter on POST /api/complaints, 429 with Retry-After — 4 (evidence/25 §3: 3 allowed, 4th 429 + retry-after: 60, Redis-backed window)
 - [ ] E4 Redis AOF on a named volume, justification written down — 1
 
 ## F · AI layer — 25
-- [ ] F1 TriageProvider interface with ≥3 working implementations selected by env var — 5
-- [ ] F2 structured output requested and validated against Pydantic schema; malformed output rejected safely — 5
-- [ ] F3 timeout, single jittered retry on retryable errors only, fallback to rules, triaged_by recorded — 6
-- [ ] F4 content-hash caching of triage results with measured, reported hit rate — 3
-- [ ] F5 prompt-injection guardrail plus a test submitting an injection attempt — 3
-- [ ] F6 triage_latency_ms recorded and surfaced through /api/meta/providers — 2
+- [x] F1 TriageProvider interface with ≥3 working implementations selected by env var — 5 (rules/simulated/llm/ollama via TRIAGE_PROVIDER; evidence/24 factory + per-provider checks)
+- [x] F2 structured output requested and validated against Pydantic schema; malformed output rejected safely — 5 (evidence/24: parse_triage rejects bad category/confidence; malformed → ProviderError → fallback, never retried)
+- [x] F3 timeout, single jittered retry on retryable errors only, fallback to rules, triaged_by recorded — 6 (evidence/24: 503 retried once with jitter, 401/400 not retried, timeout retried; evidence/25 §6 rules:fallback + triaged_by)
+- [ ] F4 content-hash caching of triage results with measured, reported hit rate — 3 (mechanism proven in evidence/24 miss→hit + hit counter; still owes the duplicate-submit script + hit-rate number in notes)
+- [x] F5 prompt-injection guardrail plus a test submitting an injection attempt — 3 (evidence/24: tag-early injection attempt cannot escape the tag)
+- [x] F6 triage_latency_ms recorded and surfaced through /api/meta/providers — 2 (evidence/25 §5: recent_triages[].latency_ms populated per outcome)
 - [ ] F7 PII/data-governance ADR: what leaves machine, to whom, why acceptable — 1
 
 ## G · Docker and Compose — 15

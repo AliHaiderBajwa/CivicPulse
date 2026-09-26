@@ -158,4 +158,24 @@ every response also carries x-request-id (echoed from the log's request_id)
 X-Forwarded-For note for nginx/CDN: client_ip() takes the FIRST hop; safe only
 when a trusted proxy overwrites/appends the header. Raise with Ali before the
 K8s ingress lands (issue #17 territory).
+
+================================================================================
+[10] FOUR-LAYER SEPARATION (rubric C2)
+
+$ rg "SELECT|INSERT|UPDATE|DELETE|text\(|execute\(" backend/app/routes backend/app/services
+(only match) services/stats_service.py:24: self._cache.delete(STATS_KEY)   # Redis, not SQL
+$ rg "execute\(|text\(" backend/app/repositories  ->  3 SQL call sites, all in the repository
+=> no SQL outside repositories; routes only translate HTTP <-> service calls.
+
+================================================================================
+[11] LIVENESS vs READINESS WITH A DEAD DATABASE (rubric C4)
+server restarted with DATABASE_URL=...:WRONGPASS@... (Postgres refuses auth)
+
+GET :8001/health  -> 200
+HTTP/1.1 200 OK
+{"status":"ok"}                     # never touches the database
+
+GET :8001/ready  -> 503
+{"status":"degraded","dependencies":{"postgres":false,"redis":true}}
+=> dead DB takes the pod out of rotation (503) but never restarts it (200).
 ================================================================================

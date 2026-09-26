@@ -314,4 +314,40 @@ Quality Gate stops failing, and #3's PR survives dev moving underneath it.
 **Next:** Ali reviews #23 → merge → tick D1–D4 → issue #4 triage providers
 (always-raise → 201 `rules:fallback` is the non-negotiable test) → #5, #6, #10.
 
+## M11 — complaints/stats/meta/health routes live, 12 rubric boxes ticked (2026-09-26)
+
+**Expected:** issue #5+#6's application layer lands — routes wired through to the
+services, verified over real HTTP against cp-pg/cp-redis, contract untouched,
+with enough evidence to tick the C/E/F boxes this batch actually earns.
+
+**Achieved:**
+- **Routes implemented** on `feat/complaints-api` (stacked on #4 + #3 branches):
+  `complaints` (create/list/get/status), `stats`, `meta/providers`, `health`
+  (`/ready` returns 503 `degraded` when either dependency is down), plus the
+  Redis rate-limit dependency on POST. DI in `deps.py` uses `Annotated` (ruff
+  B008-clean); routes return service results and let `response_model` serialize
+  (mypy-clean, contract export byte-identical).
+- **End-to-end proof** (`docs/evidence/25-complaints-api.txt`): 201 with
+  `triaged_by:"simulated"` and triage-derived category; field-level 400s;
+  404/409 messages verbatim; stats MISS→HIT→MISS-invalidation; 3×201 then 429
+  with `retry-after: 60`; `/health` **200 while Postgres auth is broken** and
+  `/ready` 503 `degraded` (liveness/readiness split, C4's whole point);
+  `SIMULATED_FAIL_MODE=raise` → **201 + `triaged_by:"rules:fallback"` + one
+  WARNING JSON line** (hard rule held on the request path, not just in unit
+  tests); structured access logs with `request_id` echoed as `x-request-id`.
+- **Gates:** ruff 0, mypy 0 (39 files), exporter re-run → `git diff
+  docs/openapi.json` empty after implementing everything.
+- **12 checklist boxes ticked with pointers:** C1–C4 (C2 grep proof: no SQL
+  outside repositories), E1–E3, F1–F3, F5, F6. F4 deliberately left open
+  (still owes the duplicate-submit hit-rate script + number).
+- Two PS gotchas avoided after earlier incidents: curl bodies sent via `-d
+  @file` (PS 5.1 mangles embedded quotes), all UTF-8 edits via the edit tool.
+
+**Evidence:** commits `ac1ed2d` (services), `270c4b7` (DI), `bbd6cef` (routes),
+`9d2e2cd` (evidence 25); `docs/evidence/25-complaints-api.txt`.
+
+**Next:** Dockerfile + `.dockerignore` + SIGTERM drain proof (C6) + compose AOF
+(E4) → push, PR `Closes #5, Closes #6` (Dockerfile rides along per Ali's
+ruling) → then #10 test suite, #17, #18 docs.
+
 <!-- New entries above this line. -->
