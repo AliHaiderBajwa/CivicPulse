@@ -19,16 +19,18 @@ contract (docs/openapi.json, handoff \u00a71):
 """
 
 import json
-import sys
 from pathlib import Path
 
 from app import schemas
 from app.main import app
 
 SERVERS = [
-    {"url": "/api", "description": "Relative \u2014 frontend proxies /api (ADR 0002)"}
+    {"url": "/api", "description": "Relative — frontend proxies /api (ADR 0002)"}
 ]
 ROOT_PATHS = {"/health", "/ready", "/metrics"}
+# Fixed destination derived from this file's location (backend/app -> repo root),
+# never from arguments: the exporter always writes <repo>/docs/openapi.json.
+TARGET = Path(__file__).resolve().parents[2] / "docs" / "openapi.json"
 
 
 def build_spec() -> dict:
@@ -68,7 +70,7 @@ def build_spec() -> dict:
 
 
 def main() -> None:
-    target = Path(sys.argv[1] if len(sys.argv) > 1 else "../docs/openapi.json")
+    target = TARGET
     target.parent.mkdir(parents=True, exist_ok=True)
     spec = build_spec()
     target.write_text(
