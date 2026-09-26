@@ -231,6 +231,22 @@ commit `c37ef00`, PR #21 (open, checks green).
 **Next:** Ashar reviews #21 → merge → tick A5, close #19 → continue J-block
 (ADRs, RUNBOOK, ENGINEERING-NOTES) and `scripts/check_submission.py`.
 
+
+## M8 close-out — PR #21 approved by Ashar, merged, A5 ticked (2026-09-26)
+
+**What changed since the M8 entry:** `ashar1x` approved PR #21 and it merged as
+`4e1d80d`. `dev` history now shows the full A5 story in topology: Ashar's
+`ac5bf30` (5s) via PR #20, Ali's `0a69916` (30s) from the pre-merge base, the
+two-parent resolution `c37ef00` (5s wins, rationale in body), evidence
+`02/03/04` (txt + png), and both PR review threads. `compose.yaml:65` on `dev`
+is `interval: 5s`; the stack validates (`docker compose config` clean).
+Checklist A5 ticked; issue #19 was already closed. Nothing about the conflict
+was re-staged or re-worded after the fact — the evidence files are byte-identical
+to what was captured mid-conflict.
+
+**Next:** J-block (ADRs, RUNBOOK, ENGINEERING-NOTES) and
+`scripts/check_submission.py`; Ashar's backend PRs (#1 first) are the main event.
+
 ## M9 — A5 ticked, Ashar's environment stood up, issue #1 skeleton = PR #22 (2026-09-26)
 
 **Expected:** Ashar closes out A5 by reviewing #21, brings up his local toolchain
