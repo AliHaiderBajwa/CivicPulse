@@ -10,11 +10,13 @@ A citizen submits a complaint; the system validates it, triages it with an LLM (
 git clone https://github.com/AliHaiderBajwa/CivicPulse.git && cd CivicPulse
 cp .env.example .env        # add your LLM_API_KEY for live triage
 
-# The real backend is being built in `backend/` (see docs/ASHAR-HANDOFF.md).
-# Until it lands, the contract stub serves the identical API on the same port:
+# The real backend is landing in `backend/` (skeleton merged; endpoints in #5).
+# Until `backend/Dockerfile` exists, the contract stub serves the identical
+# API on the same port (compose.yaml needs a Dockerfile to build `backend/`):
 docker compose -f compose.stub.yaml up -d --wait   # -> http://localhost:8080
 
-# Once `backend/` exists this is the only command you need — same file, no flags:
+# Once `backend/Dockerfile` lands with the working endpoints this is the only
+# command you need — same file, no flags:
 docker compose up -d --wait
 ```
 
