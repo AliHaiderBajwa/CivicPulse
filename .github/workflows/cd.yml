@@ -34,7 +34,11 @@ jobs:
         image: postgres:16-alpine
         env:
           POSTGRES_USER: civicpulse
-          POSTGRES_PASSWORD: civicpulse
+          # Ephemeral throwaway credential for this disposable service container,
+          # identical to ci.yml's: PostgreSQL requires a password env here and
+          # a fork-safe workflow must not depend on a repo secret. Not a real
+          # secret, never reused anywhere, lives for the length of one job.
+          POSTGRES_PASSWORD: civicpulse # NOSONAR
           POSTGRES_DB: civicpulse
         ports:
           - 5432:5432
@@ -71,13 +75,15 @@ jobs:
         if: hashFiles('backend/pyproject.toml') != ''
         run: |
           set -euo pipefail
-          # Mirrors ci.yml test-backend byte-for-byte in behaviour: pyproject is
-          # tool-config only (no [project] table), so the editable install fails
-          # on purpose and requirements.txt is the real dependency source. This
-          # step had never executed before PR #26 landed the guard file - its
-          # first live run on dev was red (pip install -e ".[dev]" cannot work).
-          python -m pip install --quiet -e backend || python -m pip install --quiet -r backend/requirements.txt
-          python -m pip install --quiet pytest pytest-cov httpx
+          # Behavioural parity with ci.yml test-backend, with the installs
+          # tightened for the security gate: requirements.lock is the uv-compiled
+          # full closure with SHA-256 hashes (same flags the Dockerfile uses), so
+          # there is no unlocked resolver step at all, and the test tools are
+          # pinned to the versions CI resolved green on this commit. pyproject is
+          # tool-config only (no [project] table) - its editable install fails by
+          # design, so it is not attempted here; requirements.lock is the source.
+          python -m pip install --quiet --only-binary :all: --no-deps --require-hashes -r backend/requirements.lock
+          python -m pip install --quiet --only-binary :all: pytest==9.1.1 pytest-cov==7.1.0 httpx==0.28.1
           cd backend
           alembic upgrade head || true
           python -m app.seed || true
