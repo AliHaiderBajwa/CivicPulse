@@ -488,4 +488,141 @@ F4 measurement the checklist still owed.
 0.75 hit rate + my four ENGINEERING-NOTES answers with file:line refs) → tick
 F4, D3, J5 → A3/A4 process boxes → book the demo video with Ali → dev→main.
 
+## M15 - issue #18 docs = PR #28 (TRIAGE.md, ENGINEERING-NOTES, ADR 0001+0004) (2026-09-26)
+
+**Expected:** issue #18's deliverables land while their `file:line` refs are
+still true - TRIAGE.md (providers, JSON/Pydantic path, timeout/retry, cache +
+measured hit rate, guardrail, fallback test + CI link) and my four §5.2
+answers plus the "also required" extras; ADRs 0001 and 0004 per PLAN §7;
+THE RULE artifacts with the milestone.
+
+**Achieved:**
+- PR #28 opened off `origin/dev` with four documents: `docs/TRIAGE.md`
+  (six sections, real CI run link, reproduction command for the hit-rate
+  probe), `docs/ENGINEERING-NOTES.md` (Q4 + Q8 written in full, Q7 Compose
+  confirmation, Ali's Q1/Q2/Q3/Q5/Q6/Q7-write scaffolded with pending
+  markers, plus the index-reasons table, stats TTL+invalidation, `redisdata`
+  justification, honest "not observed live" Groq note, measured hit rate),
+  `docs/adr/0001-provider-interface.md` (structural Protocol vs ABC vs
+  scattered if/elif vs plugins vs framework), `docs/adr/0004-pii-and-data-
+  governance.md` (per-provider egress table, what never leaves structurally).
+- **106/106 `file:line` refs machine-verified** against the final-state tree
+  (`feat/test-suite` content) - six wrong citations caught and fixed before
+  push (test-suite's `complaint_service` is +2 vs dev, redaction's comment
+  block grew, the 429 check is line 46, status-change invalidate is line 54).
+  The PR body states it **must merge after #26** so every ref stays true on
+  `dev`.
+- All four issue-#18 topics (provider interface, retry policy, stats-cache
+  TTL+invalidation, fallback guarantees) are answered somewhere in the four
+  documents.
+- Boxes ticked: **F7** (ADR 0004), **D3** (named-query index reasons),
+  **F4** (script + 0.75 + TRIAGE §3).
+- **#25 and #26 both merged into `dev` as merge commits (`3c9ee7e`,
+  `1f5470b`)** with Ali's preconditions verified first (#25 landed, all 8
+  checks green on #26's tip `857fdc1`, run 36265133413); this branch then
+  synced with `origin/dev` and the four append conflicts (PROGRESS,
+  AI-USAGE, checklist, docx) resolved by keeping both sides.
+
+**Evidence:** PR #28 (https://github.com/AliHaiderBajwa/CivicPulse/pull/28);
+`docs/evidence/28-metrics-f4.txt` (F4 hit_rate 0.75).
+
+**Next:** Ali on #27/#28 (queue comment already posted). Then A4
+commit-share recompute, README API table, RUNBOOK triage section, demo
+video, dev -> main.
+
+## M16 - #25/#26 merged per Ali's rule, CD gate exposed red, hotfix = PR #30, A4 ticked (2026-09-26)
+
+**Expected:** execute Ali's merge instruction exactly (merge #25 first, then
+sync/merge #26, merge commits never squash, watch for the ci.skip anomaly),
+then keep going until every open defect is fixed.
+
+**Achieved:**
+- **#25 merged `3c9ee7e`, #26 merged `1f5470b` - both merge commits**, in
+  that order; no squash, no history duplication (#26 already contained
+  #25's commits). #26's preconditions were verified before merging: #25 on
+  dev, all 8 checks green on the tip `857fdc1` (run 36267113413's lineage),
+  no `push.pushOption ci.skip` configured. **No ci.skip anomaly**: every
+  push produced a run within ~2 minutes.
+- **Post-merge dev CI green** (run 36267110824) - but **dev CD went red**
+  (run 36267110631): the `test (gate)` backend step ran for the first time
+  in its life (its `hashFiles('backend/pyproject.toml')` guard only became
+  true when #26 landed) and died on `pip install -e ".[dev]"`, which cannot
+  work by design - pyproject is tool config only, and the CD copy had
+  neither CI's `|| requirements.txt` fallback nor its Postgres/Redis
+  services. **Issue #29** documents it; **PR #30** mirrors ci.yml's
+  test-backend byte-for-byte in behaviour (services, env, install recipe,
+  warm-up, coverage gate; timeout 10 -> 15 min). dev CD stays blocked
+  (`needs: test`) until #30 merges.
+- **docs branch (#28) synced with post-#26 dev** via merge commit
+  `9e17a54`; the four append conflicts (PROGRESS M13/M14 vs M15, AI-USAGE
+  rows, checklist D/F4 blocks, binary docx) resolved by keeping both sides
+  + union of ticks, docx regenerated; **8/8 green**, and all **84**
+  `file:line` refs re-verified against the merged tree (0 bad).
+- **A4 ticked**: 87 commits on dev, Ashar 46 (52.9%) / Ali 41 (47.1%) -
+  both ≥35, both ≥35%.
+- Ali's non-blocking entrypoint-trim suggestion answered with the ordering
+  gap it has (seed runs pre-lifespan, so deleting the alembic line breaks
+  fresh-DB seeding silently) and two correct shapes (a: seed self-migrates;
+  b: seed moves into the lifespan), asked which he wants.
+
+**Evidence:** CD red run 36267110631 + green CI 36267110824 on the same
+SHA; issue #29; PR #30; PR #28 checks 8/8 at `9e17a54`; `git shortlog -sn
+origin/dev`.
+
+**Next:** Ali's +1 on #30 (unblocks CD), #28, #27 → then entrypoint trim
+follow-up, A1/A2/A3 evidence pass with Ali, README API table + RUNBOOK
+triage section, demo video, dev -> main.
+
+## M17 - submission gate = PR #32, RUNBOOK triage half, all four review PRs green (2026-09-27)
+
+**Expected:** close the last gap assignable without Ali - the brief section
+4/5 requirement `scripts/check_submission.py clean` - land the RUNBOOK
+section that is mine, and leave every open PR green for his review.
+
+**Achieved:**
+- **`scripts/check_submission.py` (PR #32, Closes #31)** - 12 checks, one
+  per automatic deduction in brief section 5: `-20` env/key history,
+  `-20/-15` key patterns across tracked files, `-15` k8s base64-decoded +
+  stringData with placeholder exemption, `-8` unpinned images, `-8`
+  localhost service-to-service (probe/ingress-host exempt), `-8`
+  frontend->DB path, `-8` published db/cache ports and non-ClusterIP
+  Services, `-8` ungated publish/deploy jobs, `-8` deploying `:latest`
+  (k8s/compose.prod image fields + `IMAGE_TAG=` + cd.yml's refuse-to-apply
+  guard must exist), `-8` Postgres Deployment without PVC, `-5` direct
+  commits to main via `git rev-list origin/main --not origin/dev`, `-5`
+  quickstart file references.
+- **The gate caught a real defect on its first run**: `.env.example`
+  shipped `IMAGE_TAG=latest` - one `cp` away from the `-8` "deploying
+  :latest" deduction. Fixed (empty + comment, so compose.prod's `:?` guard
+  forces a SHA) and **mutation-tested**: the old value fails check 9 with
+  the exact line, the new value passes. Ruff-clean (16 findings, incl. the
+  blind-except and missing `check=False` the fix pass surfaced).
+- **Publish-vs-deploy ambiguity resolved in the check**: GHCR keeps the
+  brief-required `latest` *alias* (publish), while deploy is field-scanned
+  (k8s `image`/`newTag`, compose.prod, `IMAGE_TAG=`, guard presence) so
+  cd.yml's own `grep ':latest'` refusal and the explanatory comments do
+  not self-flag.
+- **`docs/RUNBOOK.md` (my half of #14)** landed as `8f40adb`: the complete
+  triage-failing section - diagnostics, error-class table, safe actions for
+  compose + k8s, `FLUSHDB` notes, always-raise drill, fail-fast caveat;
+  Ali's deploy/rollback/logs sections scaffolded pending.
+- **Review surface all green**: #27 8/8, #28 8/8 (at `8f40adb`), #30 8/8
+  (at `238e12c`). #30's Sonar sweep: S6698 cleared on both credential
+  literals with justified bare `# NOSONAR` (ephemeral service credential,
+  identical to ci.yml - `POSTGRES_PASSWORD` needed one line, `DATABASE_URL`
+  its own); S8541/S8544 cleared by installing from `requirements.lock`
+  (`--only-binary :all: --no-deps --require-hashes`, the Dockerfile's own
+  recipe) plus pinned `pytest==9.1.1 pytest-cov==7.1.0 httpx==0.28.1` -
+  test-backend green on the pins.
+- Checklist box **`python3 scripts/check_submission.py` clean** ticked.
+
+**Evidence:** PR #32 (Closes #31); gate run 12/12 PASS exit 0;
+`ruff check scripts/check_submission.py` clean; mutation run FAIL at
+`.env.example:21`; PR #30 checks 8/8 at `238e12c`.
+
+**Next:** Ali's reviews on #27/#28/#30/#32 (all green) -> merges in order
+(#30 first: unblocks dev CD) -> entrypoint trim per his a/b pick ->
+A1/A2/A3 evidence pass -> README quickstart staleness (lines 13-15 still
+describe the pre-#25 stub path - his file) -> demo video -> dev -> main.
+
 <!-- New entries above this line. -->

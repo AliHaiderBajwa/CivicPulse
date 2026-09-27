@@ -6,7 +6,7 @@ One box per rubric line. Tick only when **evidence exists** (code, screenshot, l
 - [ ] A1 main protected: no direct push, PR required, CI required, ≥1 approval; screenshot in docs/evidence/ — 3
 - [ ] A2 two-branch model (dev + feature branches); no work committed directly to main — 2
 - [ ] A3 ≥5 merged PRs, each linked to an Issue, each with a substantive review comment from partner — 4
-- [ ] A4 ≥35 commits, conventional prefixes, neither partner below 35% (git shortlog -sn) — 3
+- [x] A4 ≥35 commits, conventional prefixes, neither partner below 35% (git shortlog -sn) — 3 (87 commits on dev at 1f5470b: Ashar Ahmed 46 = 52.9%, Ali Haider Bajwa 41 = 47.1% — both ≥35, both ≥35%; conventional prefixes throughout)
 - [x] A5 one deliberate merge conflict on real code, resolved, with markers/resolution/merge evidence + 2–4 sentences on why that version won — 3 (PR #20 Ashar 5s + PR #21 Ali 30s→resolved 5s, approved by ashar1x, merged 4e1d80d; docs/evidence/02–04; rationale in #21 body + c37ef00)
 
 ## B · Frontend — 18
@@ -28,7 +28,7 @@ One box per rubric line. Tick only when **evidence exists** (code, screenshot, l
 ## D · Data layer — 12
 - [x] D1 Alembic migrations; zero schema DDL in application startup code — 4 (evidence/23: upgrade head → downgrade base → upgrade head all exit 0; grep `CREATE TABLE|ALTER TABLE|DROP TABLE` over backend/app returns nothing — the lifespan only invokes `alembic upgrade head`)
 - [x] D2 schema complete incl. triaged_by, ai_summary, triage_latency_ms, timestamptz — 3 (evidence/23 §psql \d: all columns + triaged_by CHECK incl. `simulated`, summary ≤140, timestamptz created_at/updated_at with now() defaults)
-- [ ] D3 two indexes, each justified by a named query in notes — 2
+- [x] D3 two indexes, each justified by a named query in notes — 2 (ENGINEERING-NOTES "Reason for each index": `ix_complaints_created_at` ← feed ORDER BY at complaint_repository.py:42; `ix_complaints_status_priority` ← filtered queue at :35-39; schema in evidence/23)
 - [x] D4 idempotent seed of ≥30 realistic complaints; running twice changes nothing — 3 (evidence/23: run 1 inserted 34, run 2 inserted 0/skipped 34; 34 rows, 6 categories, 4 statuses; uuid5 + ON CONFLICT)
 
 ## E · Cache layer — 10
@@ -41,10 +41,10 @@ One box per rubric line. Tick only when **evidence exists** (code, screenshot, l
 - [x] F1 TriageProvider interface with ≥3 working implementations selected by env var — 5 (rules/simulated/llm/ollama via TRIAGE_PROVIDER; evidence/24 factory + per-provider checks)
 - [x] F2 structured output requested and validated against Pydantic schema; malformed output rejected safely — 5 (evidence/24: parse_triage rejects bad category/confidence; malformed → ProviderError → fallback, never retried)
 - [x] F3 timeout, single jittered retry on retryable errors only, fallback to rules, triaged_by recorded — 6 (evidence/24: 503 retried once with jitter, 401/400 not retried, timeout retried; evidence/25 §6 rules:fallback + triaged_by)
-- [ ] F4 content-hash caching of triage results with measured, reported hit rate — 3 (mechanism proven in evidence/24 miss→hit; **duplicate-submit script shipped in PR #27** — `scripts/triage_hit_rate.py` measured **hit_rate = 0.75** (30 hits/10 misses/40 lookups, expected (4−1)/4) twice, evidence/28 [1]; still needs the number in TRIAGE.md before ticking)
+- [x] F4 content-hash caching of triage results with measured, reported hit rate — 3 (`scripts/triage_hit_rate.py` shipped in PR #27 + docs/evidence/28 [1]: hit_rate 0.75 = 30 hits/10 misses/40 lookups, expected (4−1)/4, two identical runs; reported in docs/TRIAGE.md §3 and ENGINEERING-NOTES "measured cache hit rate"; mechanism in evidence/24)
 - [x] F5 prompt-injection guardrail plus a test submitting an injection attempt — 3 (evidence/24: tag-early injection attempt cannot escape the tag)
 - [x] F6 triage_latency_ms recorded and surfaced through /api/meta/providers — 2 (evidence/25 §5: recent_triages[].latency_ms populated per outcome)
-- [ ] F7 PII/data-governance ADR: what leaves machine, to whom, why acceptable — 1
+- [x] F7 PII/data-governance ADR: what leaves machine, to whom, why acceptable — 1 (docs/adr/0004-pii-and-data-governance.md: per-provider egress table, reporter_contact structurally never passed (complaint_service.py:21), redaction before egress (triage_orchestrator.py:42), SecretStr key)
 
 ## G · Docker and Compose — 15
 - [x] G1 both images multi-stage, pinned base, non-root USER, exec-form CMD, cache-correct layer order — 4 (frontend from M2; backend evidence/26 §1: python:3.12.13-slim-bookworm, USER 10001, venv layer before app COPY, 74.1 MB)
@@ -86,6 +86,6 @@ One box per rubric line. Tick only when **evidence exists** (code, screenshot, l
 - [ ] BN5 OpenTelemetry tracing frontend→backend→LLM — +2
 
 ## Submission gate (run before submitting)
-- [ ] `python3 scripts/check_submission.py` clean
-- [ ] no `.env` in git history
+- [x] `python3 scripts/check_submission.py` clean
+- [x] no `.env` in git history (proved by `scripts/check_submission.py` checks 1-2)
 - [ ] cd.yml success link · GHCR SHA image links · video link · shortlog · hpa capture + chart
