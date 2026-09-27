@@ -76,8 +76,14 @@ export default function SubmitPage() {
 
   return (
     <section aria-labelledby="submit-heading">
+      <p className="eyebrow">Citizen intake</p>
       <h2 id="submit-heading">Submit a complaint</h2>
-      <form onSubmit={handleSubmit} noValidate>
+      <p className="page-lede">
+        Describe the problem and where it is. CivicPulse validates it,
+        triages it with AI, and files it with the municipality.
+      </p>
+      <div className="submit-grid">
+      <form onSubmit={handleSubmit} noValidate className="card">
         <div className="field">
           <label htmlFor="complaint-text">Complaint text</label>
           <textarea
@@ -87,6 +93,9 @@ export default function SubmitPage() {
             aria-describedby={clientErrors.text ? 'complaint-text-error' : undefined}
             rows={6}
           />
+          <p className="hint" aria-hidden="true">
+            {text.length} / {MAX_TEXT} characters
+          </p>
           {clientErrors.text && (
             <p id="complaint-text-error" role="alert" className="field-error">
               {clientErrors.text}
@@ -132,7 +141,7 @@ export default function SubmitPage() {
           )}
         </div>
 
-        <button type="submit" disabled={loading}>
+        <button type="submit" disabled={loading} className="btn-accent">
           {loading ? 'Submitting…' : 'Submit complaint'}
         </button>
       </form>
@@ -167,16 +176,56 @@ export default function SubmitPage() {
           <h3>Triage result</h3>
           <dl>
             <dt>Category</dt>
-            <dd data-testid="result-category">{result.category}</dd>
+            <dd>
+              <span className="pill pill-sky" data-testid="result-category">
+                {result.category}
+              </span>
+            </dd>
             <dt>Priority</dt>
-            <dd data-testid="result-priority">{result.priority}</dd>
+            <dd>
+              <span
+                className={
+                  result.priority === 'high'
+                    ? 'pill pill-red'
+                    : result.priority === 'normal'
+                      ? 'pill pill-sky'
+                      : 'pill pill-slate'
+                }
+                data-testid="result-priority"
+              >
+                {result.priority}
+              </span>
+            </dd>
             <dt>AI summary</dt>
             <dd data-testid="result-summary">{result.ai_summary ?? '—'}</dd>
             <dt>Provider (triaged_by)</dt>
-            <dd data-testid="result-provider">{result.triaged_by}</dd>
+            <dd>
+              <span className="pill pill-mono" data-testid="result-provider">
+                {result.triaged_by}
+              </span>
+            </dd>
           </dl>
+          <div className="result-meta">
+            <div className="meta-cell">
+              <span className="meta-label">Latency</span>
+              <span className="meta-value">
+                {result.triage_latency_ms} ms
+              </span>
+            </div>
+            <div className="meta-cell">
+              <span className="meta-label">Filed</span>
+              <span className="meta-value">
+                {new Date(result.created_at).toLocaleString()}
+              </span>
+            </div>
+            <div className="meta-cell">
+              <span className="meta-label">Reference</span>
+              <span className="meta-value">{result.id.slice(0, 8)}</span>
+            </div>
+          </div>
         </section>
       )}
+      </div>
     </section>
   );
 }
