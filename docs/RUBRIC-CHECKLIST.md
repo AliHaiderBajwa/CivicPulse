@@ -4,8 +4,8 @@ One box per rubric line. Tick only when **evidence exists** (code, screenshot, l
 
 ## A · Collaboration and version control — 15
 - [x] A1 main protected: no direct push, PR required, CI required, ≥1 approval; screenshot in docs/evidence/ — 3 (evidence/30: live API output — PR required, 1 approval, dismiss-stale, 7 required checks, no force pushes/deletions)
-- [ ] A2 two-branch model (dev + feature branches); no work committed directly to main — 2
-- [ ] A3 ≥5 merged PRs, each linked to an Issue, each with a substantive review comment from partner — 4
+- [x] A2 two-branch model (dev + feature branches); no work committed directly to main — 2 (evidence/29: main = 3 Block-0 commits, `rev-list main --not dev` = 0)
+- [x] A3 ≥5 merged PRs, each linked to an Issue, each with a substantive review comment from partner — 4 (evidence/29: 10 qualifying PRs, verbatim quotes)
 - [x] A4 ≥35 commits, conventional prefixes, neither partner below 35% (git shortlog -sn) — 3 (87 commits on dev at 1f5470b: Ashar Ahmed 46 = 52.9%, Ali Haider Bajwa 41 = 47.1% — both ≥35, both ≥35%; conventional prefixes throughout)
 - [x] A5 one deliberate merge conflict on real code, resolved, with markers/resolution/merge evidence + 2–4 sentences on why that version won — 3 (PR #20 Ashar 5s + PR #21 Ali 30s→resolved 5s, approved by ashar1x, merged 4e1d80d; docs/evidence/02–04; rationale in #21 body + c37ef00)
 

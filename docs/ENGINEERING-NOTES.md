@@ -31,7 +31,8 @@ Three places where the laptop and CI deliberately differ, each frozen by a pinne
    CI installs from the pinned `requirements.txt` fallback in `test-backend`,
    and images build from the hash-locked `requirements.lock`
    (`backend/Dockerfile`, `evidence/26` §1); the frontend `npm ci`s from its
-   lockfile into a non-root nginx image (`frontend/Dockerfile:40-41`). No
+   lockfile (`frontend/Dockerfile:7`) into a non-root nginx image
+   (`USER nginx`, `frontend/Dockerfile:41`). No
    floating resolver step anywhere in the pipeline.
 
 ### 2. Position on the CI/CD maturity ladder (Lecture 03, slide 32), next rung and what it buys — *Ali*
@@ -58,7 +59,7 @@ all-at-once cutover.
 `sed -i -E "s|newTag: .*|newTag: ${SHA}|"` on the selected overlay.
 That one line is the entire promotion mechanism: images are built exactly
 once per commit, published under both the SHA and a `latest` alias
-(`cd.yml:168,178` — verified same-digest in `evidence/22`), and the
+ (`cd.yml:167-168,177-178` — verified same-digest in `evidence/22`), and the
 environment is pointed at the tested bytes by rewriting the tag, never by
 rebuilding. A pre-apply assertion then refuses any manifest containing
 `:latest` and requires every owned image to end in `:${SHA}`
