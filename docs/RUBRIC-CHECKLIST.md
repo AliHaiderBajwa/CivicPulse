@@ -79,7 +79,7 @@ One box per rubric line. Tick only when **evidence exists** (code, screenshot, l
 - [x] J5 docs/ENGINEERING-NOTES.md answering all eight §5.2 questions with file-and-line references — 2 (Q1-3,5-7 Ali; Q4,8 Ashar; index/volume/hit-rate/Groq/context appendices; zero _pending_ remain)
 
 ## Bonus — capped at +15
-- [ ] BN1 zero-downtime rolling update under live load, zero failed requests — +4
+- [x] BN1 zero-downtime rolling update under live load, zero failed requests — +4 (k6: 15 VUs × 150 s, rollout restart at T+50 s, 0/12068 failed, 100% checks; strategy maxUnavailable 0 pre-existing; evidence/34)
 - [ ] BN2 GitOps (Argo CD or Flux) reconciling cluster from repo — +4
 - [ ] BN3 deploy by image digest + Cosign signing/verification in CI — +3
 - [ ] BN4 Prometheus scraping /metrics + Grafana dashboard screenshot — +2

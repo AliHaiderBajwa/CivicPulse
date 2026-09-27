@@ -1,0 +1,45 @@
+# Evidence 34 — BN1: zero-downtime rolling update under live load
+
+Captured 2026-09-27T11:26:41Z by Ali Haider Bajwa. All numbers below are
+k6's own end-of-run summary (`/tmp/bn1-summary.json` + `bn1.log`), quoted
+verbatim; the procedure is reproducible via `scripts/load/rolling-update.js`.
+
+## Procedure
+
+1. Constant load: 15 VUs × 150 s against the k3d Ingress
+   (`http://127.0.0.1:8080`, `Host: civicpulse.localhost` — same routing
+   as the `k8s-up.sh` smoke). Every iteration POSTs a complaint (unique
+   `X-Forwarded-For` per request so the per-IP limiter never trips) and
+   GETs `/api/stats`. HPA left ENABLED throughout.
+2. At T+50 s into the run: `kubectl rollout restart deployment/backend`.
+   Rollout completed DURING the run (`successfully rolled out`); rollout
+   history advanced (revisions 1–4, the test restart creating the newest).
+3. Deployment strategy (pre-existing, no manifest changes for this test):
+   `RollingUpdate` with `maxSurge: 1, maxUnavailable: 0` — a replacement
+   pod must be Ready before any old pod terminates.
+
+## Result — zero failed requests across a full pod replacement
+
+Excerpt from k6's canonical text summary (authoritative rendering):
+
+    http_req_failed................: 0.00%  0 out of 12068
+    checks_succeeded...: 100.00%  12068 out of 12068
+    checks_failed......: 0.00%  0 out of 12068
+    ✓ POST created 201
+    ✓ stats 200
+
+- 6034 iterations (2 requests each), 15/15 VUs for the full 150 s.
+- 12,068/12,068 checks passed; 0 failed requests, 0 interrupted iterations.
+- Backend pods were fully replaced mid-run; no request ever hit a dead pod
+  (readiness gates + maxUnavailable 0 + uvicorn SIGTERM drain, cf. evidence/26).
+
+## Honest scope notes
+
+- The k3d backend image under test is the `:dev` stub build (platform
+  mechanics proof — rollout strategy, readiness gates, drain behaviour —
+  which are app-agnostic; the same strategy object governs the real image).
+- Backend commit range under load is NOT part of this claim; the claim is
+  strictly availability during pod replacement.
+- Machine-readable k6 JSON uses an inverted internal representation for
+  rate metrics; the text summary above is the authoritative rendering and
+  the numbers cited are from it.
