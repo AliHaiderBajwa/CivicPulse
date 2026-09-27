@@ -625,4 +625,44 @@ section that is mine, and leave every open PR green for his review.
 A1/A2/A3 evidence pass -> README quickstart staleness (lines 13-15 still
 describe the pre-#25 stub path - his file) -> demo video -> dev -> main.
 
+## M18 - Wave 1 complete: all four PRs merged in Ali's order, CD proven green (2026-09-27)
+
+**Expected:** execute Ali's review wave exactly as he ordered (#30 first, #27
+before #28, #32 last), prove the CD hotfix live for him in-thread, and start
+the process-evidence pass while he writes Wave 2.
+
+**Achieved:**
+- **All four approvals landed from Ali**: #30 (he owned the missing-fallback
+  root cause as his bug in-thread), #27, #28 *conditional on merging #27
+  first* (the F4 tick points at #27's files — he flipped my listed order with
+  reasoning in the review), #32 (he ran the gate himself: 12/12 clean).
+- **Merged in his order, all merge commits**: #30 `b356d40` → #27 `226bf3f`
+  → #28 `792298b` → #32 `f40a3ab`. Issues **#17/#18/#29/#31 auto-closed**;
+  open PRs = 0; only #14 remains open (his docs halves).
+- **CD hotfix proven live**: run **36306336956 completed SUCCESS** on
+  `b356d40` — the `test (gate)` backend step that was red yesterday went
+  green on its first post-merge execution; Ali watched per his request and
+  the in-thread comment carries the link. Intermediate runs for `226bf3f`/
+  `792298b` were auto-cancelled by newer pushes; the final-state run
+  **36306517542** on `f40a3ab` is the submission-pack link.
+- **Entrypoint ruling on #26: keep as-is, retraction posted** — the ordering
+  gap analysis stood, he agreed, no follow-up PR needed.
+- **J4 shot list + two recording slots published as issue #33** (assigned to
+  Ali, awaiting his pick; open question flagged: recording tool).
+- **`docs/evidence/29-a2-a3-process.txt`**: A2 proof (main = 3 Block-0
+  bootstrap commits, `rev-list origin/main --not origin/dev` = 0, gate check
+  11 runs the same command) + A3 inventory (**10 qualifying PRs** vs the 5
+  required, verbatim substantive review quotes from both partners). A2/A3
+  ticked with pointer — Ali's review of this PR is the confirmation; A1
+  still needs his screenshot.
+- A4 recompute noted in the evidence: 103 dev commits = 62/41 → 60.2%/39.8%,
+  still both ≥35.
+
+**Evidence:** `docs/evidence/29-a2-a3-process.txt`; CD run 36306336956
+(success); merged SHAs above; issue #33.
+
+**Next:** Ali's Wave 2 (J5 answers, ADR 0002+0003, J3 RUNBOOK halves, J1
+README, A1 screenshot, BN decision) → my pack assembly as his PRs land →
+video on his slot → dev → main.
+
 <!-- New entries above this line. -->

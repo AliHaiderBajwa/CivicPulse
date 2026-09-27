@@ -1,0 +1,151 @@
+CivicPulse — evidence/29: A2 + A3 process proof
+Captured 2026-09-27 by Ashar Ahmed + AI agent (opencode). Every block below is
+machine output (local git / GitHub REST API), nothing hand-typed.
+
+================================================================================
+A2 — two-branch model; no work committed directly to main
+================================================================================
+
+$ git log origin/main --oneline
+8ecbcd4 feat: freeze API contract, stub backend, and README (Block 0)
+02c681e docs: scaffold process artifacts and standing orders
+423b8b3 chore: initialize repo with gitignore and env contract
+
+(Exactly 3 commits: the Block-0 bootstrap made before the two-branch rule
+existed — project scaffolding, not feature work. Every commit after the rule
+exists arrived via PR.)
+
+$ git rev-list origin/main --not origin/dev --count
+0
+
+=> Every commit reachable from origin/main is also on origin/dev.
+   Zero commits live on main outside the PR flow. The same command is gate
+   check 11 in scripts/check_submission.py ("no direct commits to main"),
+   which exits non-zero the moment a direct-to-main commit appears.
+
+Workflow facts:
+- Work branches off dev (feat/..., fix/..., docs/..., chore/...) and lands on
+  dev only through a reviewed PR (green-only branch protection on dev).
+- dev is protected: 7 required status checks (evidence/09). main requires
+  PR + 1 approval + checks (endgame gate; documented in AGENTS.md).
+
+$ git shortlog -sn origin/dev
+    62	Ashar Ahmed
+    41	Ali Haider Bajwa
+
+(103 commits total; A4 ticked at 87 — recompute here: 60.2% / 39.8%, both
+still >= 35% and both >= 35 commits.)
+
+================================================================================
+A3 — >=5 merged PRs, each linked to an issue, each with a substantive review
+     comment from the partner
+================================================================================
+
+Requirement: 5.  Qualifying on the current record: 10.
+
+| PR  | Closes | author    | partner review          | states                 |
+|-----|--------|-----------|-------------------------|------------------------|
+| #21 | #19    | Ali       | ashar1x                 | APPROVED (quote 1)     |
+| #22 | #1     | ashar1x   | AliHaiderBajwa          | APPROVED (quote 2)     |
+| #23 | #3     | ashar1x   | AliHaiderBajwa          | CHANGES_REQUESTED + APPROVED (quotes 3a/3b) |
+| #24 | #4     | ashar1x   | AliHaiderBajwa          | APPROVED (quote 4)     |
+| #25 | #5     | ashar1x   | AliHaiderBajwa          | CHANGES_REQUESTED + APPROVED (quotes 5a/5b) |
+| #26 | #10    | ashar1x   | AliHaiderBajwa          | APPROVED + 2 preconditions (quote 6) |
+| #27 | #17    | ashar1x   | AliHaiderBajwa          | APPROVED (quote 7)     |
+| #28 | #18    | ashar1x   | AliHaiderBajwa          | APPROVED + merge-order condition (quote 8) |
+| #30 | #29    | ashar1x   | AliHaiderBajwa          | APPROVED (quote 9)     |
+| #32 | #31    | ashar1x   | AliHaiderBajwa          | APPROVED (quote 10)    |
+
+("Substantive" = review body > 100 chars of verification detail, verbatim
+below. #15/#16 are early Ali-authored scaffolding PRs with no linked issue and
+are not counted toward the >= 5.)
+
+--- quote 1, PR #21 (ashar1x, APPROVED) ---
+Reviewed as @ashar1x - verified, not just read: - **Real conflict, real base.**
+`0a69916` sits on `07648b1` (pre-merge) and `c37ef00` has both parents
+(`0a69916` + `7c5de58`, the PR #20 merge) - the graph in `04-merge-graph.txt`
+shows the diamond; nothing was...
+
+--- quote 2, PR #22 (AliHaiderBajwa, APPROVED) ---
+Reviewed against issue #1 and the frozen contract - verified mechanically, not
+just read: **Contract (docs/openapi.json, branch file vs dev):** 5 paths -> 8
+paths, 9 operations (POST+GET share /complaints, so 8 paths is correct); all
+frozen operationIds prese...
+
+--- quote 3a, PR #23 (AliHaiderBajwa, CHANGES_REQUESTED) ---
+Deep review - the data layer itself is approved in substance, one cross-file
+inconsistency blocks merging: **Verified and good:** migration creates the 3
+enum types (checkfirst), table, all 4 CHECKs, both indexes with per-query
+rationale comments; downgrade d...
+
+--- quote 3b, PR #23 (AliHaiderBajwa, APPROVED) ---
+Change request satisfied - verified at all three layers on the tip:
+`TriagedBy` Literal, `docs/openapi.json` enum, and regenerated `schema.d.ts`
+all admit `simulated`, matching the migration CHECK. The latent #5 500 is
+closed. Data layer substance (migration r...
+
+--- quote 4, PR #24 (AliHaiderBajwa, APPROVED) ---
+Reviewed #4 end to end - this is the 25-mark core and it holds up:
+**Providers:** guarded system prompt names the complaint untrusted;
+delimiter-strip is case-insensitive so early tag-close fails; every LLM
+response goes through `model_validate_json`; is_ret...
+
+--- quote 5a, PR #25 (AliHaiderBajwa, CHANGES_REQUESTED) ---
+Substantive review - nearly there. The services, image, and evidence are
+strong; one deploy-blocking gap must close first. **Blocking: nothing migrates
+a fresh database.** I searched the branch and the manifests: no lifespan
+migration, no initContainer, no mi...
+
+--- quote 5b, PR #25 (AliHaiderBajwa, APPROVED) ---
+Lifespan fix verified and accepted - my change request is satisfied, so I'm
+clearing it. NOT merging (sequencing stays with you per ongoing work).
+**Verified on tip 4416cd1:** BACKEND_DIR-anchored alembic.ini (cwd-independent:
+compose, kind/CD, k8s-up.sh, han...
+
+--- quote 6, PR #26 (AliHaiderBajwa, APPROVED) ---
+Substantive review complete - approving with two non-negotiable merge
+preconditions below. **Verified (read, not skimmed):** conftest guard
+(suffix-or-GITHUB_ACTIONS, fakeredis-optional with real-service fallback,
+per-test TRUNCATE+flushdb); doubles (Counting...
+
+--- quote 7, PR #27 (AliHaiderBajwa, APPROVED) ---
+Approved - tiny, green, and every claim checked. Scope is exactly 2 files
+(three-dot diff confirms nothing else rides along): the stdlib-only probe
+(correct (REPEATS-1)/REPEATS expectation math, rotating X-Forwarded-For so the
+limiter can't pollute the measure...
+
+--- quote 8, PR #28 (AliHaiderBajwa, APPROVED) ---
+Approved with one merge-order condition (see bottom) - the docs themselves are
+strong. **Verified, not skimmed:** A4 counts (87 commits, 52.9/47.1 - both
+sides clear 35/35%); D3 index refs resolve to the named queries (feed ORDER BY
+at repository.py:42, filte...
+
+--- quote 9, PR #30 (AliHaiderBajwa, APPROVED) ---
+Hotfix approved - diagnosis confirmed and the mirror is faithful. Notes for the
+record: **Root cause was mine:** my CD test gate ran bare
+`pip install -e ".[dev]"` with no fallback, while ci.yml always had
+`-e backend || requirements.txt`. The step was hash-g...
+
+--- quote 10, PR #32 (AliHaiderBajwa, APPROVED) ---
+Approved - ran it myself from a clean worktree, not just read it: all 12
+checks PASS, exit 0 on the current tree. Coverage is complete against brief
+ 5 (history scan for .env/keys, K8s placeholders, pins, localhost,
+frontend-DB path, published ports, needs: ga...
+
+================================================================================
+Supporting links (PR pages carry the full untruncated review bodies)
+================================================================================
+#21 https://github.com/AliHaiderBajwa/CivicPulse/pull/21
+#22 https://github.com/AliHaiderBajwa/CivicPulse/pull/22
+#23 https://github.com/AliHaiderBajwa/CivicPulse/pull/23
+#24 https://github.com/AliHaiderBajwa/CivicPulse/pull/24
+#25 https://github.com/AliHaiderBajwa/CivicPulse/pull/25
+#26 https://github.com/AliHaiderBajwa/CivicPulse/pull/26
+#27 https://github.com/AliHaiderBajwa/CivicPulse/pull/27
+#28 https://github.com/AliHaiderBajwa/CivicPulse/pull/28
+#30 https://github.com/AliHaiderBajwa/CivicPulse/pull/30
+#32 https://github.com/AliHaiderBajwa/CivicPulse/pull/32
+
+Gate cross-check (run on this branch):
+$ python scripts/check_submission.py
+  12/12 PASS, exit 0 — includes check 11 (no direct commits to main).
