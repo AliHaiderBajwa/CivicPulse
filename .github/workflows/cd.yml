@@ -225,7 +225,9 @@ jobs:
           output-file: backend-sbom.spdx.json
 
       - name: Install Cosign (pinned release, keyless-only usage)
-        uses: sigstore/cosign-installer@v3
+        # Full commit SHA of the moving `v3` tag (S7637: tag refs are
+        # mutable, the digest-bound signing step below must not be):
+        uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
         with:
           cosign-release: v2.4.1
 
