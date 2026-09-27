@@ -697,4 +697,23 @@ pointers; screenshots + API render committed.
 **Next:** Ashar reviews/merges per Wave 3 (ticks already in this PR);
 BN call + video slot reply posted; J4 video at the booked slot.
 
+
+## M22 — BN3: keyless Cosign signing verified live in CD (2026-09-27)
+
+**Expected:** rubric BN3 (+3) — every published image signed (keyless) and
+verified in CI, bound to digests rather than tags.
+
+**Achieved:**
+- `publish` job: `id-token: write` added (only permission change);
+  cosign-installer@v3 pinned to cosign v2.4.1; sign step
+  (`cosign sign --yes <ref>@<digest>` for both images); verify step
+  (repo-scoped OIDC identity regexp, branch-agnostic); publish timeout
+  15→20 min. Nothing else in the pipeline touched.
+- Live proof via `workflow_dispatch` (run 36316718561): test/build/
+  publish/deploy-k8s all green; both verify steps exit-gate under
+  `set -euo pipefail`, so green *is* the proof. Digests confirmed in
+  GHCR under the branch SHA.
+
+**Evidence:** docs/evidence/35-cosign-signing.txt; run 36316718561.
+
 <!-- New entries above this line. -->
