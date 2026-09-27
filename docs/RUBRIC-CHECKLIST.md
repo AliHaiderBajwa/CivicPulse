@@ -3,7 +3,7 @@
 One box per rubric line. Tick only when **evidence exists** (code, screenshot, link, or doc section).
 
 ## A · Collaboration and version control — 15
-- [ ] A1 main protected: no direct push, PR required, CI required, ≥1 approval; screenshot in docs/evidence/ — 3
+- [x] A1 main protected: no direct push, PR required, CI required, ≥1 approval; screenshot in docs/evidence/ — 3 (evidence/30: live API output — PR required, 1 approval, dismiss-stale, 7 required checks, no force pushes/deletions)
 - [x] A2 two-branch model (dev + feature branches); no work committed directly to main — 2 (evidence/29: main = 3 Block-0 commits, `rev-list main --not dev` = 0)
 - [x] A3 ≥5 merged PRs, each linked to an Issue, each with a substantive review comment from partner — 4 (evidence/29: 10 qualifying PRs, verbatim quotes)
 - [x] A4 ≥35 commits, conventional prefixes, neither partner below 35% (git shortlog -sn) — 3 (87 commits on dev at 1f5470b: Ashar Ahmed 46 = 52.9%, Ali Haider Bajwa 41 = 47.1% — both ≥35, both ≥35%; conventional prefixes throughout)
@@ -72,11 +72,11 @@ One box per rubric line. Tick only when **evidence exists** (code, screenshot, l
 - [x] I7 evidence of a red pipeline blocking a merge, then green — 1
 
 ## J · Documentation, portfolio and reflection — 15
-- [ ] J1 README.md: problem statement, badges, Mermaid architecture diagram, working one-command quickstart, API table, screenshots — 4
-- [ ] J2 four ADRs: provider interface; frontend runtime config; deploy-by-SHA; PII/data governance — 4
-- [ ] J3 docs/RUNBOOK.md: deploy, roll back, read logs, what to do when triage starts failing — 2
+- [x] J1 README.md: problem statement, badges, Mermaid architecture diagram, working one-command quickstart, API table, screenshots — 4 (badges CI/CD; quickstart is plain `docker compose up`, stub footnoted; screenshots 31/32 are live-k3d browser captures)
+- [x] J2 four ADRs: provider interface; frontend runtime config; deploy-by-SHA; PII/data governance — 4 (0001/0002/0003/0004, each with context/decision/alternatives/consequences + file:line refs)
+- [x] J3 docs/RUNBOOK.md: deploy, roll back, read logs, what to do when triage starts failing — 2 (deploy ×3 paths, undo vs SHA re-apply with the migrations-only-forward rule, log recipes incl. --previous + request_id tracing + triage section)
 - [ ] J4 demo video ≤5 minutes, both partners speaking: clean clone → running system, AI triage, fallback, network isolation failing, HPA scaling, rollback — 3
-- [ ] J5 docs/ENGINEERING-NOTES.md answering all eight §5.2 questions with file-and-line references — 2
+- [x] J5 docs/ENGINEERING-NOTES.md answering all eight §5.2 questions with file-and-line references — 2 (Q1-3,5-7 Ali; Q4,8 Ashar; index/volume/hit-rate/Groq/context appendices; zero _pending_ remain)
 
 ## Bonus — capped at +15
 - [ ] BN1 zero-downtime rolling update under live load, zero failed requests — +4
