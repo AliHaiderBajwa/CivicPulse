@@ -29,17 +29,20 @@ const TEXTS = [
 ];
 
 function citizenIp() {
-  return `10.${__VU % 250}.${__ITER % 255}.${((__ITER / 255) | 0) % 250}`;
+  return `10.${__VU % 250}.${__ITER % 255}.${Math.trunc(__ITER / 255) % 250}`;
 }
 
-export default function () {
+export default function runScenario() {
   const ip = citizenIp();
   const headers = {
     "Content-Type": "application/json",
     "X-Forwarded-For": ip,
     ...HOST,
   };
-  const text = TEXTS[Math.floor(Math.random() * TEXTS.length)];
+  // Text choice is load-generation jitter only, not security-relevant
+  // randomness (no tokens, no identifiers, nothing observable is derived
+  // from it) — fixed-pattern complaints would bias the latency profile.
+  const text = TEXTS[Math.floor(Math.random() * TEXTS.length)]; // NOSONAR
   const created = http.post(
     `${BASE}/api/complaints`,
     JSON.stringify({ text, location: `BN1 St ${ip.split(".").pop()}` }),

@@ -698,6 +698,34 @@ pointers; screenshots + API render committed.
 BN call + video slot reply posted; J4 video at the booked slot.
 
 
+## M20 — frontend redesign: civic-ops design system, zero test changes (2026-09-27)
+
+**Expected:** user asked for a premium frontend via the frontend skill.
+Delegation to a visual-engineering subagent failed twice (API outage, then
+insufficient account funds), so the work moved in-house following the same
+skill protocol: ui-ux-pro-max design-system direction + redesign-skill
+audit-first workflow + DESIGN.md contract before components.
+
+**Achieved:** DESIGN.md contract; index.css token system; App/Submit/
+Dashboard/Stats refined with every test hook preserved (15/15 green, zero
+test edits at the time); tsc/eslint/build clean; screenshots re-captured
+live. Full detail in M20b below; history rewritten once to drop an
+accidental Wave-2 contamination (branch rebased clean, force-pushed).
+
+## M20b — Stitch-fidelity pass: reference-matched UI, honest omissions (2026-09-27)
+
+**Trigger:** user-supplied Stitch screens + shield logo as visual contract;
+taste-skill design read (VARIANCE 4 / MOTION 3 / DENSITY 5, Inter correct
+for accessibility-first briefs). Adapted, not cloned: ~20 unbacked controls
+omitted as theatre (logged in DESIGN.md); icon font replaced by inline SVG;
+WCAG AAA footer claim refused.
+
+**Achieved:** Inter scale, 80rem container, joined tab container, hero
+action rows, record pill, numbered pagination (+1 test: 16/16 green),
+result meta grid (real fields only), stat icons + computed shares, favicon.
+tsc/eslint/build clean; re-captured live. Zero backend/k8s/contract/infra
+changes.
+
 ## M21 — BN1: zero-downtime rolling update proven under live load (2026-09-27)
 
 **Expected:** rubric BN1 (+4) — replace every backend pod mid-load with zero

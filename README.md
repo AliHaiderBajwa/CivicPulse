@@ -61,6 +61,7 @@ Live stack on local k3d (`scripts/k8s-up.sh`), one real submitted complaint:
 
 ![Operations dashboard with one triaged complaint](docs/evidence/31-dashboard.png)
 ![Submit-a-complaint form](docs/evidence/32-submit.png)
+![Aggregate statistics with cache badge](docs/evidence/33-stats.png)
 
 ## Documentation
 
