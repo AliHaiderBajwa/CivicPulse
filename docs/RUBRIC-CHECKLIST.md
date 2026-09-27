@@ -81,7 +81,7 @@ One box per rubric line. Tick only when **evidence exists** (code, screenshot, l
 ## Bonus — capped at +15
 - [ ] BN1 zero-downtime rolling update under live load, zero failed requests — +4
 - [ ] BN2 GitOps (Argo CD or Flux) reconciling cluster from repo — +4
-- [ ] BN3 deploy by image digest + Cosign signing/verification in CI — +3
+- [x] BN3 deploy by image digest + Cosign signing/verification in CI — +3 (keyless Fulcio/Rekor signatures bound to digests, verified in-job; dispatch run 36316718561 all green; evidence/35)
 - [ ] BN4 Prometheus scraping /metrics + Grafana dashboard screenshot — +2
 - [ ] BN5 OpenTelemetry tracing frontend→backend→LLM — +2
 

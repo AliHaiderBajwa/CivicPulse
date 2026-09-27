@@ -1,0 +1,44 @@
+# Evidence 35 — BN3: keyless Cosign signing + verification in CD
+
+Captured 2026-09-27 by Ali Haider Bajwa. Claim: every published image carries
+a keyless Cosign signature (Fulcio OIDC + Rekor transparency log) bound to
+the exact digest deployed — not to a tag.
+
+## Live proof: dispatch CD run on bn/bn3-cosign (commit 79e6d47)
+
+Run 36316718561 (workflow_dispatch, branch bn/bn3-cosign): **success** —
+test (gate), build, publish, deploy-k8s all green. The publish job contains
+two new steps that did not exist before this work:
+
+- `Sign both images with Cosign (keyless, by digest)`: resolves each
+  `${IMAGE_BASE}-<frontend|backend>:${GITHUB_SHA}` to its digest via
+  `buildx imagetools inspect`, then `cosign sign --yes <ref>@<digest>`.
+- `Verify both signatures`: `cosign verify --certificate-identity-regexp
+  '^https://github.com/AliHaiderBajwa/CivicPulse/'
+  --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'`
+  against the same digest refs. Both steps run under `set -euo pipefail`,
+  so the green run conclusion *is* the verification: any failed signature
+  or failed verification would have failed the publish job and blocked
+  deploy-k8s (needs: gating).
+
+Supporting facts, independently checkable:
+- cosign-installer@v3 with pinned cosign v2.4.1 (installer step green —
+  a nonexistent pin would fail the job before any signing).
+- publish job gained `id-token: write` (Fulcio OIDC), nothing else changed
+  in its permission surface (contents:read, packages:write as before).
+- Digests are recorded to the run summary by the pre-existing digest step;
+  signatures are recorded alongside them by the new sign step.
+- Identity regexp (not exact string) so the same verification works on
+  branch dispatches (`.../bn/bn3-cosign`) and post-merge dev runs
+  (`.../dev`) alike.
+
+## Design answers, pre-empted
+
+- *Why sign by digest, not tag?* A tag can move; the digest cannot. The
+  signature stays pinned to the tested bytes even if `latest` ever drifts.
+- *Why keyless, not a stored key?* No long-lived secret to rotate, leak,
+  or scope: each signature is minted from the run's own OIDC identity and
+  logged in Rekor. There is nothing to steal from the repo.
+- *Why verify in the same job?* The rubric asks for signing/verification;
+  verifying immediately proves the Fulcio/Rekor chain end to end inside CI
+  rather than asserting it happened.
