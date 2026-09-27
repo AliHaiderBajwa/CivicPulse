@@ -8,15 +8,67 @@ Kubernetes answers. Refs point at the tree after PRs #25/#26 have merged.
 
 ### 1. Three laptop-vs-CI differences and the exact Dockerfile/manifest lines that freeze them — *Ali*
 
-_Pending — Ali's answer, with the Dockerfile and workflow lines._
+Three places where the laptop and CI deliberately differ, each frozen by a pinned line:
+
+1. **Service addressing and published ports.** Compose talks over Docker DNS
+   (`BACKEND_URL: backend:8000`, `compose.yaml:17`; `DATABASE_URL`/`REDIS_URL`
+   env, `compose.yaml:40-41`, resolving against the `database`/`cache` hosts)
+   and publishes host ports (8080 for the frontend, 8000 for the backend,
+   dev-only — `compose.yaml:51`, never in `compose.prod.yaml`). CI instead
+   maps the service containers to localhost
+   (`postgresql+psycopg://…:…@localhost:5432/civicpulse`, `ci.yml:75`;
+   `redis://localhost:6379/0`, `ci.yml:76`) and publishes nothing else.
+   Both sides pin the identical images, so the bytes are equal and only the
+   topology differs (`postgres:16-alpine`, `compose.yaml:76` and `ci.yml:53`;
+   `redis:7-alpine`, `compose.yaml:100` and `ci.yml:66`).
+2. **Persistence.** The laptop keeps named volumes across runs (`pgdata`,
+   `redisdata` with AOF) — data survives `down`. CI starts empty on every
+   run (fresh service containers; the integration job traps
+   `docker compose down -v`). Same images, different lifecycle: this is why
+   migrate-from-zero and seed idempotence are proven in CI rather than
+   trusted from a long-lived laptop database.
+3. **Dependency installation.** The laptop uses a venv / editable install;
+   CI installs from the pinned `requirements.txt` fallback in `test-backend`,
+   and images build from the hash-locked `requirements.lock`
+   (`backend/Dockerfile`, `evidence/26` §1); the frontend `npm ci`s from its
+   lockfile into a non-root nginx image (`frontend/Dockerfile:40-41`). No
+   floating resolver step anywhere in the pipeline.
 
 ### 2. Position on the CI/CD maturity ladder (Lecture 03, slide 32), next rung and what it buys — *Ali*
 
-_Pending — Ali's answer._
+On the standard ladder (manual → CI → continuous delivery to staging →
+continuous deployment to production → progressive/self-service delivery), this
+repo sits at **continuous delivery to a production-like ephemeral
+environment**: every PR gets build, typecheck, tests, security scan and
+contract validation; every merge to `dev` deploys SHA-pinned, SBOM'd images
+to a fresh kind cluster with Ingress smoke. What it is *not* yet is
+continuous deployment *to production*: there is no long-lived staging, no
+human promotion step, and no progressive rollout.
+
+The next rung is a persistent staging environment with promotion by the same
+SHA-rewrite mechanism plus progressive delivery (canary or blue-green) and
+GitOps reconciliation. What that buys: prod-parity confidence the ephemeral
+cluster cannot give (real DNS/TLS, real data volumes, real traffic shape),
+an auditable promotion trail, and safe incremental exposure instead of
+all-at-once cutover.
 
 ### 3. The exact line that guarantees build-once-deploy-many, and what breaks without it — *Ali*
 
-_Pending — Ali's answer (deploy-by-SHA)._
+`.github/workflows/cd.yml:293`:
+`sed -i -E "s|newTag: .*|newTag: ${SHA}|"` on the selected overlay.
+That one line is the entire promotion mechanism: images are built exactly
+once per commit, published under both the SHA and a `latest` alias
+(`cd.yml:168,178` — verified same-digest in `evidence/22`), and the
+environment is pointed at the tested bytes by rewriting the tag, never by
+rebuilding. A pre-apply assertion then refuses any manifest containing
+`:latest` and requires every owned image to end in `:${SHA}`
+(`cd.yml:296-303`) — the −8 deduction is caught by code, not discipline.
+
+Without it, the failure modes are: per-environment rebuilds (the running
+bytes were never the tested bytes), `latest` ambiguity (two deploys minutes
+apart running different code under one tag), and untraceable rollbacks.
+With it, rollback is re-applying the previous SHA (`docs/RUNBOOK.md` §2)
+and every running image traces to its commit, CI run and SBOM.
 
 ### 4. What "correct" means for a probabilistic LLM component, and how CI stayed deterministic — *Ashar*
 
@@ -72,15 +124,59 @@ without passing four deterministic gates:
 
 ### 5. HPA lag in seconds, where the time went, what would reduce it — *Ali*
 
-_Pending — Ali's answer (k6 capture, `evidence/17`)._
+Measured from `docs/evidence/16-hpa-collect.csv` (166 samples) against
+`docs/evidence/17-k6-rps.csv`, charted in `evidence/18`:
+
+- Load ramps past 20 rps at **22:26:50** (peak 521.6 rps).
+- First scale event **22:28:01**: 2 → 6 replicas at 213% CPU — **71 s lag**.
+- 9 replicas at 22:28:13, all 10 by 22:28:19 (**+89 s**).
+- Load ends 22:30:30 (2.4 rps); back to 2 replicas at 22:32:17 (**+107 s**).
+- One flapping blip: 3 replicas at 22:35:10 (CPU 71%), reabsorbed to 2 by
+  22:40:40 — the stabilization window doing its job visibly.
+
+Policy (`k8s/base/hpa.yaml`): min 2 / max 10 (`:15-16`), CPU target 60%
+(`:21`), scale-up stabilization **0 s** (`:28`), scale-down 300 s (`:26`).
+Where the 71 s went: the metrics pipeline dominates (metrics-server scrape
+cadence plus HPA sync — on the order of a minute), with pod startup and
+readiness gates making up the remainder. Scale-up stabilization is 0 *by
+design* (users are waiting), so no policy delay hides in the upward path;
+the downward path is deliberately slow (300 s window) because flapping
+replicas is more expensive than idle ones.
+
+What would reduce the lag: a shorter metrics-server resolution, a
+leaner/faster-ready image, or warm standby pods — each trading cost or
+complexity for seconds. The honest attribution is that well over half the
+observed lag is pipeline delay, not application startup.
 
 ### 6. Why VPA runs in Off mode, and the failure mode of Auto alongside HPA — *Ali*
 
-_Pending — Ali's answer (`evidence/13`)._
+The VPA runs recommender-only (`updateMode: "Off"`,
+`k8s/base/vpa.yaml:19`); its current recommendation is committed in
+`evidence/13` and applied to requests by a human, not by the machine. Auto
+mode alongside this HPA would fight it, as the comment at the top of the
+file states (`vpa.yaml:1-4`): the VPA raises the CPU request, computed
+utilisation drops, the HPA scales in, per-pod load rises, the VPA raises the
+request again — an oscillation loop. Recommender + HPA is the stable pairing:
+one system decides *how many* pods, the other *advises* how big; the human
+closes the loop on a schedule instead of every sync interval.
 
 ### 7. Where the `internal: true` network leaves the LLM-calling service, and how you resolved it — *Ali writes, Ashar confirms*
 
-_Ali's answer pending. My confirmation of the Compose side:_
+**K8s side — *Ali*.** The honest headline first: the cluster has **no
+NetworkPolicies** (verified by grep — flat pod network), so K8s does *not*
+replicate Compose's `internal: true` isolation. What it has instead:
+ClusterIP-only services (`k8s/base/services.yaml:12,29,46,63`), no published
+DB/cache ports anywhere (no NodePort/LoadBalancer; external traffic enters
+only through the Ingress), credentials exclusively via `secretKeyRef`
+(`k8s/base/backend.yaml:32-44`, never env literals), and DNS-only service
+discovery (no `localhost`). The LLM call egresses through the node's default
+route with no egress control — acceptable here because there are no hostile
+in-cluster actors, secrets never land in images, and Postgres/Redis are
+unreachable from outside the cluster. What would close it: a default-deny
+NetworkPolicy with explicit allow rules (backend→database/cache/DNS,
+Ingress→frontend/backend, backend→internet for the LLM).
+
+*Ashar's confirmation of the Compose side (agreed — matches the file):*
 
 - `backend` joins **both** networks — `edge` and `internal`
   (`compose.yaml:54-56`) — so it is the only service that can both reach the
@@ -178,8 +274,20 @@ is not — that asymmetry is exactly why both mechanisms exist.
   (`compose.yaml:103-105`) with `everysec` bounds data loss to about a
   second — trivial write volume, real anti-abuse continuity. Detail:
   `evidence/26` §4.
-- **`pgdata` (Postgres PVC)** — *Ali*: pending.
-- **`ollama_models`** — *Ali*: pending.
+- **`pgdata` (Postgres PVC)** — *Ali*: Postgres is a StatefulSet, not a
+  Deployment (`k8s/base/postgres.yaml:7`), with `volumeClaimTemplates`
+  (`:70-72`) giving one stable volume per ordinal, forever — identity and
+  storage move together, so a rescheduled `postgres-0` reattaches *its*
+  data rather than any data. Proven, not asserted:
+  `docs/evidence/21-postgres-persistence.txt` deletes the pod outright
+  (uid change recorded) and every row survives on the replacement. A
+  Deployment with a single shared PVC would corrupt the moment it scaled
+  past one replica; the StatefulSet makes scaling safe by construction.
+- **`ollama_models`** — *Ali*: caches pulled Ollama model weights at
+  `/root/.ollama` (`compose.yaml:125`) so an opt-in local-model run does
+  not re-pull ~800 MB on every `up` (the in-file rationale). Profile-gated
+  (`compose.yaml:122`): default runs and CI never pay for it — the volume
+  only materialises when someone explicitly opts into the ollama profile.
 
 ### Groq live rate limits, as observed
 
@@ -191,10 +299,26 @@ against a fake client rather than against Groq: `is_retryable` accepts 429
 a 401/400 is never retried (`test_llm_provider.py:73`). If a live limit was
 seen from CD or Ali's machine, Ali should append it here.
 
+*Ali, appending 2026-09-27:* confirmed from my side — the real key has never
+left this machine. GitHub Secrets holds a non-credential placeholder (set
+up in M6, `docs/AI-USAGE.md`), the real key lives only in the gitignored
+local `.env`, and CD injects the placeholder, so no live Groq call has ever
+originated from CI either. Every local run I did used `rules`/`simulated`.
+No live 429 observed anywhere in this project; if one ever is, the retry
+single-fires per the proven policy and the evidence goes here.
+
 ### Build-context numbers — *Ali*
 
-_Pending (both image contexts were measured in `evidence/26`; Ali owns the
-frontend number and the interpretation.)_
+Backend **0.07 MB vs 195.72 MB**, frontend **0.21 MB vs 110.5 MB**
+(`evidence/26` §2) — roughly 2800× and 500× reductions. Two mechanisms do
+the work: `.dockerignore` excludes the bulk (`.git`, venvs,
+`node_modules`, `.env` — the fastest byte to ship is the one never sent),
+and deps-first layering keeps rebuilds incremental (dependency layers stay
+cached until the lockfile changes). Why it matters three ways: CI minutes
+(smaller contexts push/pull faster on every run), pull size on deploy, and
+attack surface — `.dockerignore` is also what keeps secrets and toolchains
+out of the image, which is why the submission gate checks it
+(`scripts/check_submission.py`).
 
 ### Measured cache hit rate — *Ashar*
 

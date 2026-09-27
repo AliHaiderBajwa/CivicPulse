@@ -8,15 +8,73 @@ partner's; push to this branch or send the text.
 
 ## 1. Deploy — *Ali*
 
-_Pending — Ali's section._
+Local (fastest iteration):
+
+```bash
+cp .env.example .env        # add LLM_API_KEY for live triage, else simulated
+docker compose up -d --wait # seeded stack on http://localhost:8080
+docker compose logs backend --tail 50   # confirm lifespan migrated + seeded
+curl -s localhost:8080/api/stats | jq .total
+```
+
+Fresh Kubernetes (second command from the README):
+
+```bash
+./scripts/k8s-up.sh   # kind cluster + CRDs + images + overlay + Ingress smoke
+kubectl -n civicpulse get deploy,sts,hpa,pdb
+kubectl -n civicpulse rollout status deploy/backend
+```
+
+CI/CD (automatic): every push to `dev` builds SHA-tagged GHCR images, runs
+the full gate, and deploys the dev overlay to an ephemeral kind cluster
+with Ingress smoke (`POST /api/complaints` → 201). The run page carries the
+digests and SBOMs (`docs/evidence/22-cd-release-surface.txt`).
 
 ## 2. Roll back — *Ali*
 
-_Pending — Ali's section._
+Two mechanisms, different speeds and different promises:
+
+```bash
+# FAST (seconds): revert the last rollout in place. Keeps the database.
+kubectl -n civicpulse rollout undo deployment/backend
+kubectl -n civicpulse rollout status deployment/backend
+```
+
+```bash
+# DECLARATIVE (minutes): re-apply the previous known-good SHA overlay.
+# Find it in the CD run summary (every run records its digests), rewrite
+# newTag to that SHA, apply:
+sed -i -E "s|newTag: .*|newTag: <previous-SHA>|" k8s/overlays/dev/kustomization.yaml
+kubectl apply -k k8s/overlays/dev
+kubectl -n civicpulse rollout status deploy/backend deploy/frontend
+```
+
+When to use which: `rollout undo` for bad application code (fastest path
+back to serving); re-applying the SHA for image/config drift or when the
+rollout history itself is suspect (auditable, repeatable). Neither rolls
+the database back: migrations only move forward — `0001` ships a working
+`downgrade()` but replaying it against real rows risks data loss, so the
+rule is forward-fix the schema, never roll it back under traffic.
 
 ## 3. Read logs — *Ali*
 
-_Pending — Ali's section._
+```bash
+# Live request stream (JSON lines: request_id, method, path, status, duration_ms)
+kubectl -n civicpulse logs deploy/backend -f
+# Previous (crashed/restarted) container — the one you usually actually want
+kubectl -n civicpulse logs deploy/backend --previous --tail 100
+# Trace one citizen request end to end across services
+kubectl -n civicpulse logs deploy/backend | grep '"request_id": "<id>"'
+# The fallback canary: exactly one WARNING per provider degradation
+kubectl -n civicpulse logs deploy/backend | grep -i "triage fallback"
+
+# Local equivalents
+docker compose logs backend --tail 200 | grep -iE "triage|fallback"
+docker compose logs postgres --tail 20   # pg_isready / WAL / checkpoint lines
+
+# CI/CD logs live per job on the Actions run page (lint, tests, build, scan,
+# manifests, integration, deploy) — the run summary carries digests + SBOMs.
+```
 
 ---
 

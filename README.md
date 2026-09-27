@@ -1,5 +1,8 @@
 # CivicPulse
 
+[![ci](https://github.com/AliHaiderBajwa/CivicPulse/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/AliHaiderBajwa/CivicPulse/actions/workflows/ci.yml)
+[![cd](https://github.com/AliHaiderBajwa/CivicPulse/actions/workflows/cd.yml/badge.svg?branch=dev)](https://github.com/AliHaiderBajwa/CivicPulse/actions/workflows/cd.yml)
+
 > Municipal complaint intake, triage and operations platform — CS4032 Software Construction and Design, Assignment 1.
 
 A citizen submits a complaint; the system validates it, triages it with an LLM (category, priority, one-line summary), persists it in PostgreSQL, and surfaces it on a live operations dashboard with aggregate statistics. Five cooperating containers locally with one command; a scaled, probed, auto-scaling workload on Kubernetes in CI.
@@ -9,16 +12,11 @@ A citizen submits a complaint; the system validates it, triages it with an LLM (
 ```bash
 git clone https://github.com/AliHaiderBajwa/CivicPulse.git && cd CivicPulse
 cp .env.example .env        # add your LLM_API_KEY for live triage
-
-# The real backend is landing in `backend/` (skeleton merged; endpoints in #5).
-# Until `backend/Dockerfile` exists, the contract stub serves the identical
-# API on the same port (compose.yaml needs a Dockerfile to build `backend/`):
-docker compose -f compose.stub.yaml up -d --wait   # -> http://localhost:8080
-
-# Once `backend/Dockerfile` lands with the working endpoints this is the only
-# command you need — same file, no flags:
-docker compose up -d --wait
+docker compose up -d --wait # seeded stack on http://localhost:8080
 ```
+_Contract-only variant (no database needed): `docker compose -f
+compose.stub.yaml up -d --wait` serves the identical API from the in-memory
+stub on the same port._
 
 Kubernetes, meanwhile, needs no backend at all: `scripts/k8s-up.sh` brings up the
 whole stack (including the CRDs, the VPA recommender and the autoscaler) and
@@ -56,6 +54,13 @@ flowchart LR
 | GET | `/metrics` | Prometheus metrics |
 
 _Full contract: `docs/openapi.json` (generated from the backend)._
+
+## Screenshots
+
+Live stack on local k3d (`scripts/k8s-up.sh`), one real submitted complaint:
+
+![Operations dashboard with one triaged complaint](docs/evidence/31-dashboard.png)
+![Submit-a-complaint form](docs/evidence/32-submit.png)
 
 ## Documentation
 

@@ -625,4 +625,37 @@ section that is mine, and leave every open PR green for his review.
 A1/A2/A3 evidence pass -> README quickstart staleness (lines 13-15 still
 describe the pre-#25 stub path - his file) -> demo video -> dev -> main.
 
+
+## M19 — Wave 2 docs: J5/J2/J3/J1/A1, closes #14 (2026-09-27)
+
+**Expected:** Ashar's queue items 2+3 — one docs PR off settled dev with my
+six ENGINEERING-NOTES answers, two ADRs, three RUNBOOK sections, README
+refresh, and the A1 branch-protection shot.
+
+**Achieved:**
+- **J5:** Q1 (3 laptop-vs-CI differences, all line-anchored), Q2 (ladder
+  position + next rung, no slide quotes), Q3 (cd.yml:293 + :296-303 guard),
+  Q5 (71 s scale-up lag decomposed: metrics pipeline dominant, policy
+  windows cited, flapping blip explained), Q6 (VPA Off + the Auto fight),
+  Q7 K8s side (no NetworkPolicies — stated as an honest gap + closer),
+  pgdata/ollama_models justifications, build-context interpretation,
+  Groq no-live-observation confirmation. Zero `_Pending_` remain.
+- **J2:** ADR 0002 (envsubst runtime injection, verified nginx.conf +
+  Dockerfile lines) + ADR 0003 (deploy-by-SHA, verified cd.yml lines).
+- **J3:** deploy (compose/k8s-up/CD), rollback (undo vs SHA re-apply +
+  migrations-only-forward rule), logs (incl. --previous + request_id).
+- **J1:** quickstart is the plain one-command form (Dockerfile exists;
+  stub footnoted), CI/CD badges, screenshots 31 (dashboard, live k3d row)
+  + 32 (submit form) captured in-browser against the live stack.
+- **A1:** evidence/30 rendered from the live branch-protection API (PR +
+  1 approval + 7 checks + no force/deletion). Browser shots are real
+  viewport captures; API renders are exact-output renders (method as
+  disclosed for evidence 02-04).
+
+**Evidence:** this PR (closes #14); checklist J1/J2/J3/J5/A1 ticked with
+pointers; screenshots + API render committed.
+
+**Next:** Ashar reviews/merges per Wave 3 (ticks already in this PR);
+BN call + video slot reply posted; J4 video at the booked slot.
+
 <!-- New entries above this line. -->
