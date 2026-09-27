@@ -35,7 +35,12 @@ export default function StatsPage() {
 
   return (
     <section aria-labelledby="stats-heading">
+      <p className="eyebrow">At a glance</p>
       <h2 id="stats-heading">Aggregate statistics</h2>
+      <p className="page-lede">
+        Live totals across every filed complaint. The badge shows whether
+        this view came from the Redis cache or a fresh computation.
+      </p>
 
       <div className="stats-meta">
         <span
@@ -46,6 +51,7 @@ export default function StatsPage() {
         </span>
         <button
           type="button"
+          className="btn-quiet"
           onClick={() => setRefreshKey((key) => key + 1)}
           disabled={loading}
         >
@@ -62,46 +68,44 @@ export default function StatsPage() {
 
       {stats && !loading && !error && (
         <>
-          <p>
-            Total complaints:{' '}
-            <strong data-testid="stats-total">{stats.total}</strong>
-          </p>
+          <div className="stat-grid">
+            <div className="stat-card hero">
+              <div className="stat-label">Total complaints</div>
+              <div className="stat-value" data-testid="stats-total">
+                {stats.total}
+              </div>
+            </div>
+          </div>
 
           <h3>By category</h3>
-          <table>
-            <thead>
-              <tr>
-                <th scope="col">Category</th>
-                <th scope="col">Count</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(stats.by_category).map(([key, value]) => (
-                <tr key={key}>
-                  <td>{key}</td>
-                  <td data-testid={`count-category-${key}`}>{value}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="stat-grid">
+            {Object.entries(stats.by_category).map(([key, value]) => (
+              <div className="stat-card" key={key}>
+                <div className="stat-label">{key}</div>
+                <div
+                  className="stat-value"
+                  data-testid={`count-category-${key}`}
+                >
+                  {value}
+                </div>
+              </div>
+            ))}
+          </div>
 
           <h3>By priority</h3>
-          <table>
-            <thead>
-              <tr>
-                <th scope="col">Priority</th>
-                <th scope="col">Count</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(stats.by_priority).map(([key, value]) => (
-                <tr key={key}>
-                  <td>{key}</td>
-                  <td data-testid={`count-priority-${key}`}>{value}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="stat-grid">
+            {Object.entries(stats.by_priority).map(([key, value]) => (
+              <div className="stat-card" key={key}>
+                <div className="stat-label">{key}</div>
+                <div
+                  className="stat-value"
+                  data-testid={`count-priority-${key}`}
+                >
+                  {value}
+                </div>
+              </div>
+            ))}
+          </div>
         </>
       )}
     </section>

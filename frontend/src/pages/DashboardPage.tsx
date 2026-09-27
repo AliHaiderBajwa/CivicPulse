@@ -92,13 +92,38 @@ export default function DashboardPage() {
     }
   }
 
-  const total = data?.total ?? 0;
+  function pillFor(kind: 'category' | 'priority' | 'status', value: string): string {
+  if (kind === 'priority') {
+    return value === 'high'
+      ? 'pill pill-red'
+      : value === 'normal'
+        ? 'pill pill-sky'
+        : 'pill pill-slate';
+  }
+  if (kind === 'status') {
+    return value === 'open'
+      ? 'pill pill-sky'
+      : value === 'in_progress'
+        ? 'pill pill-amber'
+        : value === 'resolved'
+          ? 'pill pill-green'
+          : 'pill pill-slate';
+  }
+  return value === 'other' ? 'pill pill-slate' : 'pill pill-sky';
+}
+
+const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const filtersActive = category !== '' || priority !== '' || status !== '';
 
   return (
     <section aria-labelledby="dashboard-heading">
+      <p className="eyebrow">Live queue</p>
       <h2 id="dashboard-heading">Operations dashboard</h2>
+      <p className="page-lede">
+        Every filed complaint, filterable and actionable. Changing a status
+        walks the state machine — illegal transitions are refused with a 409.
+      </p>
 
       <div className="filters">
         <div className="field">
@@ -177,7 +202,24 @@ export default function DashboardPage() {
       {error && <p role="alert">{error}</p>}
 
       {!loading && !error && data && data.items.length === 0 && (
-        <p>No complaints match the current filters.</p>
+        <div className="empty-state">
+          <svg
+            width="40"
+            height="40"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <path
+              d="M9 5h11M9 12h11M9 19h11M4 5h.01M4 12h.01M4 19h.01"
+              strokeLinecap="round"
+            />
+          </svg>
+          <p>No complaints match the current filters.</p>
+        </div>
       )}
 
       {!loading && !error && data && data.items.length > 0 && (
@@ -197,10 +239,22 @@ export default function DashboardPage() {
               {data.items.map((complaint) => (
                 <tr key={complaint.id}>
                   <td>{complaint.location}</td>
-                  <td>{complaint.category}</td>
-                  <td>{complaint.priority}</td>
+                  <td>
+                    <span className={pillFor('category', complaint.category)}>
+                      {complaint.category}
+                    </span>
+                  </td>
+                  <td>
+                    <span className={pillFor('priority', complaint.priority)}>
+                      {complaint.priority}
+                    </span>
+                  </td>
                   <td>{complaint.ai_summary ?? complaint.text}</td>
-                  <td>{complaint.triaged_by}</td>
+                  <td>
+                    <span className="pill pill-mono">
+                      {complaint.triaged_by}
+                    </span>
+                  </td>
                   <td>
                     <label
                       className="visually-hidden"
