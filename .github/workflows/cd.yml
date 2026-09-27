@@ -24,9 +24,46 @@ jobs:
   test:
     name: test (gate)
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     permissions:
       contents: read
+    # Same disposable services as ci.yml's test-backend: the suite needs a
+    # real Postgres and Redis (conftest's guard admits CI's suffix-less DB).
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: civicpulse
+          # Ephemeral throwaway credential for this disposable service container,
+          # identical to ci.yml's: PostgreSQL requires a password env here and
+          # a fork-safe workflow must not depend on a repo secret. Not a real
+          # secret, never reused anywhere, lives for the length of one job.
+          POSTGRES_PASSWORD: civicpulse # NOSONAR
+          POSTGRES_DB: civicpulse
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+    env:
+      # Same disposable service credential as POSTGRES_PASSWORD above (and as
+      # ci.yml): ephemeral container, job-scoped, never a real secret.
+      DATABASE_URL: postgresql+psycopg://civicpulse:civicpulse@localhost:5432/civicpulse # NOSONAR
+      REDIS_URL: redis://localhost:6379/0
+      TRIAGE_PROVIDER: simulated
+      RATE_LIMIT_PER_MIN: "1000"
+      LOG_LEVEL: INFO
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -36,13 +73,23 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Backend suite (skipped until backend/ lands)
+      - name: Backend suite
         if: hashFiles('backend/pyproject.toml') != ''
         run: |
           set -euo pipefail
+          # Behavioural parity with ci.yml test-backend, with the installs
+          # tightened for the security gate: requirements.lock is the uv-compiled
+          # full closure with SHA-256 hashes (same flags the Dockerfile uses), so
+          # there is no unlocked resolver step at all, and the test tools are
+          # pinned to the versions CI resolved green on this commit. pyproject is
+          # tool-config only (no [project] table) - its editable install fails by
+          # design, so it is not attempted here; requirements.lock is the source.
+          python -m pip install --quiet --only-binary :all: --no-deps --require-hashes -r backend/requirements.lock
+          python -m pip install --quiet --only-binary :all: pytest==9.1.1 pytest-cov==7.1.0 httpx==0.28.1
           cd backend
-          pip install -e ".[dev]"
-          TRIAGE_PROVIDER=simulated pytest --cov=app --cov-fail-under=65 -q
+          alembic upgrade head || true
+          python -m app.seed || true
+          pytest --cov=app --cov-fail-under=65 -q
 
       - name: Frontend suite
         run: |
