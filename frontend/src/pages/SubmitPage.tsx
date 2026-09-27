@@ -205,6 +205,24 @@ export default function SubmitPage() {
               </span>
             </dd>
           </dl>
+          <div className="result-meta">
+            <div className="meta-cell">
+              <span className="meta-label">Latency</span>
+              <span className="meta-value">
+                {result.triage_latency_ms} ms
+              </span>
+            </div>
+            <div className="meta-cell">
+              <span className="meta-label">Filed</span>
+              <span className="meta-value">
+                {new Date(result.created_at).toLocaleString()}
+              </span>
+            </div>
+            <div className="meta-cell">
+              <span className="meta-label">Reference</span>
+              <span className="meta-value">{result.id.slice(0, 8)}</span>
+            </div>
+          </div>
         </section>
       )}
       </div>

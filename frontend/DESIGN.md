@@ -23,7 +23,7 @@ One font, one accent, slate neutrals. Light theme only (explicit debt).
 | `--neutral-bg` | `#E8ECF1` | Rejected, low, unknown chips |
 | `--radius-sm/md/lg` | `6px` / `10px` / `14px` | Inputs / cards / hero panels |
 | `--shadow-sm/md` | slate-tinted `rgb(15 23 42 / …)` | Single light source (top) |
-| `--font` | `'Atkinson Hyperlegible', system-ui, …` | 400 body, 700 display |
+| `--font` | `'Inter', system-ui, …` (400/500/600/700) | 400 body, 600 labels, 700 display |
 
 Status → chip mapping (color + label, never color alone):
 `open` sky · `in_progress` amber · `resolved` green · `rejected` slate.
@@ -45,7 +45,7 @@ plus a CSS pulse dot. `prefers-reduced-motion: reduce` disables all of it.
 
 ## Responsive
 
-Container `72rem`, fluid gutters. `<640px`: single column, full-width
+Container `80rem` (7xl), fluid gutters. `<640px`: single column, full-width
 inputs, table scrolls horizontally in `.table-wrap`, header stacks.
 `640–1024px`: two-column filter grid, stats grid ×2. `>1024px`: stats grid
 ×4 dashboard breathing room. Touch targets ≥44px (`min-height: 2.75rem`
@@ -61,6 +61,20 @@ testIds `cache-badge`, `stats-total`, `count-category-*`,
 Focus ring always visible: `outline: 3px solid rgba(3,105,161,.5)` +
 offset. Skip link first in tab order. Errors stay adjacent to fields with
 `role="alert"`.
+
+## Reference fidelity (Stitch screens, adapted — deviations logged)
+
+Source: user-supplied Stitch dashboard/submit/stats screens + shield logo.
+Implemented: header system, tab container, hero rows, filter card, table
+system, numbered pagination, enriched result panel, stat cards with icons,
+empty-state composition, footer line, Inter scale, micro labels.
+Deliberately omitted (unbacked by any API — dead controls are theatre):
+search box, Export CSV, Batch Actions, View Details/Assign Crew, auto-refresh
+timer, TTL countdown, latency/SLA/telemetry numbers, confidence %,
+provider allocation panel, map panel, dispatch ledger, audit links,
+avatars/version badges, System Online/Redis badges, breadcrumbs. Icon font
+replaced by inline SVG (offline reliability); logo recreated as
+favicon.svg.
 
 ## Accepted debt
 

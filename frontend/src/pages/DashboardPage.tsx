@@ -112,6 +112,24 @@ export default function DashboardPage() {
   return value === 'other' ? 'pill pill-slate' : 'pill pill-sky';
 }
 
+function pageWindow(current: number, total: number): (number | '…')[] {
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+  const keep = new Set([1, 2, current - 1, current, current + 1, total - 1, total]);
+  const pages = Array.from(keep)
+    .filter((n) => n >= 1 && n <= total)
+    .sort((a, b) => a - b);
+  const out: (number | '…')[] = [];
+  let prev = 0;
+  for (const n of pages) {
+    if (n - prev > 1) out.push('…');
+    out.push(n);
+    prev = n;
+  }
+  return out;
+}
+
 const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const filtersActive = category !== '' || priority !== '' || status !== '';
@@ -125,6 +143,11 @@ const total = data?.total ?? 0;
         walks the state machine — illegal transitions are refused with a 409.
       </p>
 
+      <div className="hero-actions">
+        <span className="record-pill">
+          Showing {total} active record{total === 1 ? '' : 's'}
+        </span>
+      </div>
       <div className="filters">
         <div className="field">
           <label htmlFor="filter-category">Category</label>
@@ -303,6 +326,24 @@ const total = data?.total ?? 0;
         <span>
           Page {page} of {totalPages} — {total} complaints
         </span>
+        <div className="page-numbers" role="group" aria-label="Pages">
+          {pageWindow(page, totalPages).map((entry, index) =>
+            entry === '…' ? (
+              <span key={`gap-${index}`} className="page-gap" aria-hidden="true">
+                …
+              </span>
+            ) : (
+              <button
+                key={entry}
+                type="button"
+                aria-current={entry === page ? 'page' : undefined}
+                onClick={() => setPage(entry)}
+              >
+                {entry}
+              </button>
+            ),
+          )}
+        </div>
         <button
           type="button"
           onClick={() => setPage((current) => current + 1)}

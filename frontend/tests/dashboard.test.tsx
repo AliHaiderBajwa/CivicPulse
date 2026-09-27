@@ -82,4 +82,24 @@ describe('DashboardPage', () => {
       ),
     );
   });
+
+  it('jumps straight to a page from the numbered pagination', async () => {
+    const many = {
+      items: [singlePage.items[0]],
+      total: 25,
+      page: 1,
+      page_size: 10,
+    };
+    fetchMock.mockImplementation(() =>
+      Promise.resolve(jsonResponse(200, many)),
+    );
+    render(<DashboardPage />);
+    fireEvent.click(await screen.findByRole('button', { name: '2' }));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenLastCalledWith(
+        '/api/complaints?page=2&page_size=10',
+        expect.anything(),
+      ),
+    );
+  });
 });
