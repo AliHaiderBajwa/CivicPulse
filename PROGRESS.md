@@ -697,4 +697,24 @@ pointers; screenshots + API render committed.
 **Next:** Ashar reviews/merges per Wave 3 (ticks already in this PR);
 BN call + video slot reply posted; J4 video at the booked slot.
 
+
+## M21 — BN1: zero-downtime rolling update proven under live load (2026-09-27)
+
+**Expected:** rubric BN1 (+4) — replace every backend pod mid-load with zero
+failed requests, on the unmodified deployment strategy.
+
+**Achieved:**
+- New probe `scripts/load/rolling-update.js`: constant 15-VU load (POST +
+  GET per iteration, unique XFF per request, ingress Host routing) for
+  150 s; `kubectl rollout restart deployment/backend` fired at T+50 s and
+  completed during the run (rollout history advanced).
+- Result: **0 failed requests out of 12,068 checks (100%)**, 6034
+  iterations, 0 interrupted. No manifest changes were needed — strategy was
+  already `RollingUpdate` with `maxUnavailable: 0`; HPA stayed on.
+- Honest scope in evidence/34: k3d image under test was the `:dev` stub
+  build (platform-mechanics proof, app-agnostic); cited numbers are k6's
+  canonical text summary, quoted verbatim.
+
+**Evidence:** docs/evidence/34-bn1-zero-downtime.txt; scripts/load/rolling-update.js.
+
 <!-- New entries above this line. -->
