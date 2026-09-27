@@ -44,3 +44,4 @@ remain responsible for every line.
 | M19 Wave-2 docs | J5 (6 answers), ADR 0002/0003, RUNBOOK ×3, README, A1 shot | HPA numbers computed from raw CSVs (not estimated); K8s network gap stated, not hidden; dashboard screenshots are live-browser captures of a real submitted complaint; A1 is a render of live API output; typo fixed before commit, not after review |
 | M20/M20b frontend | DESIGN.md, CSS system, Stitch-fidelity rebuild, screenshots | Delegation failed twice — worked in-house under skill protocol; stacking fault (Wave-2 files) caught and repaired via rebase before review |
 | M21 BN1 rolling update | k6 probe, mid-run restart, evidence/34 | Did not touch manifests (strategy already correct); cited k6 text summary after finding its JSON inverted |
+| M22 BN3 cosign | publish-job wiring, dispatch-verified live run | Branch-agnostic identity regexp so verification holds on dispatches and post-merge runs alike |
