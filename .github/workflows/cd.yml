@@ -137,10 +137,11 @@ jobs:
   publish:
     needs: build # gated: never publish without a successful build
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20 # Cosign sign + verify add ~2 min
     permissions:
       contents: read
       packages: write # least privilege: push to GHCR only
+      id-token: write # keyless Cosign signing via Fulcio OIDC (BN3)
     outputs:
       image_base: ${{ needs.build.outputs.image_base }} # forwarded for deploy
     steps:
@@ -222,6 +223,43 @@ jobs:
           format: spdx-json
           artifact-name: sbom-backend-${{ github.sha }}.spdx.json
           output-file: backend-sbom.spdx.json
+
+      - name: Install Cosign (pinned release, keyless-only usage)
+        uses: sigstore/cosign-installer@v3
+        with:
+          cosign-release: v2.4.1
+
+      # BN3: keyless signatures (Fulcio OIDC + Rekor transparency log) bound
+      # to the exact digests we deploy, not to tags: even if a tag were ever
+      # moved, the signature stays pinned to the tested bytes.
+      - name: Sign both images with Cosign (keyless, by digest)
+        run: |
+          set -euo pipefail
+          for image in frontend backend; do
+            ref="${IMAGE_BASE}-${image}:${GITHUB_SHA}"
+            digest=$(docker buildx imagetools inspect "$ref" --format '{{json .Manifest}}' | jq -r '.digest')
+            echo "signing: $ref@$digest"
+            cosign sign --yes "$ref@$digest"
+            echo "### signature: \`$ref@$digest\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+          done
+        env:
+          IMAGE_BASE: ${{ needs.build.outputs.image_base }}
+
+      - name: Verify both signatures (proves the Fulcio/Rekor chain in CI)
+        run: |
+          set -euo pipefail
+          for image in frontend backend; do
+            ref="${IMAGE_BASE}-${image}:${GITHUB_SHA}"
+            digest=$(docker buildx imagetools inspect "$ref" --format '{{json .Manifest}}' | jq -r '.digest')
+            cosign verify \
+              --certificate-identity-regexp '^https://github.com/AliHaiderBajwa/CivicPulse/' \
+              --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+              "$ref@$digest" > /dev/null
+            echo "verified: $ref@$digest"
+          done
+        env:
+          IMAGE_BASE: ${{ needs.build.outputs.image_base }}
 
   deploy-k8s:
     needs: publish # gated: deploy only after the SHA images are published
