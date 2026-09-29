@@ -75,7 +75,7 @@ One box per rubric line. Tick only when **evidence exists** (code, screenshot, l
 - [x] J1 README.md: problem statement, badges, Mermaid architecture diagram, working one-command quickstart, API table, screenshots — 4 (badges CI/CD; quickstart is plain `docker compose up`, stub footnoted; screenshots 31/32 are live-k3d browser captures)
 - [x] J2 four ADRs: provider interface; frontend runtime config; deploy-by-SHA; PII/data governance — 4 (0001/0002/0003/0004, each with context/decision/alternatives/consequences + file:line refs)
 - [x] J3 docs/RUNBOOK.md: deploy, roll back, read logs, what to do when triage starts failing — 2 (deploy ×3 paths, undo vs SHA re-apply with the migrations-only-forward rule, log recipes incl. --previous + request_id tracing + triage section)
-- [ ] J4 demo video ≤5 minutes, both partners speaking: clean clone → running system, AI triage, fallback, network isolation failing, HPA scaling, rollback — 3
+- [x] J4 demo video ≤5 minutes, both partners speaking: clean clone → running system, AI triage, fallback, network isolation failing, HPA scaling, rollback — 3 (https://youtu.be/c7ZRdIc_Tlk, 4:55)
 - [x] J5 docs/ENGINEERING-NOTES.md answering all eight §5.2 questions with file-and-line references — 2 (Q1-3,5-7 Ali; Q4,8 Ashar; index/volume/hit-rate/Groq/context appendices; zero _pending_ remain)
 
 ## Bonus — capped at +15
@@ -88,4 +88,4 @@ One box per rubric line. Tick only when **evidence exists** (code, screenshot, l
 ## Submission gate (run before submitting)
 - [x] `python3 scripts/check_submission.py` clean
 - [x] no `.env` in git history (proved by `scripts/check_submission.py` checks 1-2)
-- [ ] cd.yml success link · GHCR SHA image links · video link · shortlog · hpa capture + chart
+- [x] cd.yml success link (run 36611348141, main @ f019ad8) · GHCR SHA image links (civicpulse-backend + civicpulse-frontend @ f019ad8, digest-verified) · video link (https://youtu.be/c7ZRdIc_Tlk) · shortlog (73 Ashar / 52 Ali) · hpa capture + chart (evidence/15-hpa-watch.txt, evidence/18-hpa-load-chart.png)
