@@ -1,7 +1,7 @@
 # CivicPulse
 
 [![ci](https://github.com/AliHaiderBajwa/CivicPulse/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/AliHaiderBajwa/CivicPulse/actions/workflows/ci.yml)
-[![cd](https://github.com/AliHaiderBajwa/CivicPulse/actions/workflows/cd.yml/badge.svg?branch=dev)](https://github.com/AliHaiderBajwa/CivicPulse/actions/workflows/cd.yml)
+[![cd](https://github.com/AliHaiderBajwa/CivicPulse/actions/workflows/cd.yml/badge.svg?branch=main)](https://github.com/AliHaiderBajwa/CivicPulse/actions/workflows/cd.yml)
 
 > Municipal complaint intake, triage and operations platform — CS4032 Software Construction and Design, Assignment 1.
 
@@ -18,7 +18,7 @@ _Contract-only variant (no database needed): `docker compose -f
 compose.stub.yaml up -d --wait` serves the identical API from the in-memory
 stub on the same port._
 
-Kubernetes, meanwhile, needs no backend at all: `scripts/k8s-up.sh` brings up the
+Kubernetes needs no local setup at all: `scripts/k8s-up.sh` brings up the
 whole stack (including the CRDs, the VPA recommender and the autoscaler) and
 smoke-tests the Ingress.
 
@@ -62,6 +62,10 @@ Live stack on local k3d (`scripts/k8s-up.sh`), one real submitted complaint:
 ![Operations dashboard with one triaged complaint](docs/evidence/31-dashboard.png)
 ![Submit-a-complaint form](docs/evidence/32-submit.png)
 ![Aggregate statistics with cache badge](docs/evidence/33-stats.png)
+
+## Demo
+
+[Demo video (4:55)](https://youtu.be/c7ZRdIc_Tlk) — clean clone to running system, live AI triage, fallback, network isolation failing, HPA scaling, rollback.
 
 ## Documentation
 
