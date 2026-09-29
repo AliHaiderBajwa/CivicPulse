@@ -763,4 +763,33 @@ verified in CI, bound to digests rather than tags.
 
 **Evidence:** docs/evidence/35-cosign-signing.txt; run 36316718561.
 
+## M23 — Final submission pack: k3d v5.9 fix, video artifacts, docx (2026-09-29)
+
+**Expected:** submission branch carrying the last code fix, the J4 shooting-
+script artifacts, and a regenerated documentation package — with the 60 MB
+demo video kept out of git.
+
+**Achieved:**
+- `scripts/k8s-up.sh`: k3d v5.9 turned `--wait` into a boolean, so
+  `--wait 120s` passed `120s` as a positional arg (`accepts between 0 and
+  1 arg(s), received 2`) and the script could never create the cluster.
+  Fixed to `--wait --timeout 120s`; cluster rebuilt on `:8081` and the
+  full HPA/rollback verification re-run green.
+- `.gitignore`: added `*.mp4` — the Classroom wants a video *link*, never
+  the binary; the 4:55 `- 5min.mp4` stays untracked by construction.
+- J4 artifacts committed: `docs/VIDEO-SCRIPT-J4.docx` (tabular shooting
+  script), `docs/VIDEO-SCRIPT-COMMANDS.txt` (numbered paste list),
+  `scripts/gen_video_script.py` (single-source generator for both).
+- `scripts/build_docx.py`: cover metadata block, Word TOC field, page
+  numbers in footer; `docs/CivicPulse-Documentation.docx` regenerated.
+- Not ticked: J4 (needs the uploaded video link), line 91 (needs the
+  pack links); BN2/BN4/BN5 stay skipped per the bonus decision.
+
+**Evidence:** this branch diff; `SCD Assignment 1 - 5min.mp4` (local,
+4:55.3, A/V delta 8 ms).
+
+**Next:** Ashar reviews/merges this PR → open `dev`→`main` → Ashar
+approves → merge → `cd.yml` runs on `main` → capture green run link +
+fresh GHCR SHAs → upload video → tick J4 + line 91.
+
 <!-- New entries above this line. -->
