@@ -31,3 +31,6 @@ kubeconfig
 
 # office lock files
 .~lock.*#
+
+# recorded video — links go to Classroom, never the binary
+*.mp4

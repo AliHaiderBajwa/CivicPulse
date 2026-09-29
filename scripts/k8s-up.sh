@@ -52,7 +52,7 @@ else
   if ss -ltn 2>/dev/null | grep -q ":$HOST_PORT "; then
     die "host port $HOST_PORT is already in use. Override it: CP_HOST_PORT=<free> $0"
   fi
-  k3d cluster create "$CLUSTER" -p "$HOST_PORT:80@loadbalancer" --wait 120s
+  k3d cluster create "$CLUSTER" -p "$HOST_PORT:80@loadbalancer" --wait --timeout 120s
 fi
 kubectl config use-context "k3d-$CLUSTER" >/dev/null
 
