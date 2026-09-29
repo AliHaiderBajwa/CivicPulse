@@ -1,0 +1,6 @@
+# CRDs only -- applied before the overlays (kubectl cannot map a custom resource
+# in the same apply stream that installs its CRD).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - vpa-v1-crd-gen.yaml

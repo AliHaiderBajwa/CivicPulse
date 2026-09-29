@@ -44,7 +44,7 @@ Audit against the original PDF found these deltas from the plan's assumptions. A
 - **RAM: 3.7 GB + 3.9 GB swap** (not 6–8 GB Docker RAM). k3d works only with the `firdousi-foods-courier` containers paused during the K8s block. Ollama stays profile-only, never demoed live.
 - **Ports 5432 and 6379 are taken** by another project. Publish **no** database/cache ports in *any* compose file, dev included.
 - **Tooling (kubectl, k3d, kustomize, kubeconform, k6, trivy, syft, matplotlib) is not installed** — pre-flight installs them before H0.
-- **Image pins (G1):** `postgres:16-alpine`, `redis:7-alpine`, `nginx:1.27-alpine`, `node:22-alpine`, `python:3.12-slim` — exact tags are contractual, unpinned = −8.
+- **Image pins (G1):** `postgres:16-alpine`, `redis:7-alpine`, `nginx:1.30.5-alpine3.24`, `node:22-alpine`, `python:3.12-slim` — exact tags are contractual, unpinned = −8.
 - **Seed spread (G5):** seed data must cover all 6 categories with varied priorities/statuses, not just 30 rows.
 - **Rubric C says "ten endpoints", the §2.2 table lists nine.** Implement every table row exactly; keep `/openapi.json` exposed; ask the instructor about the count — do not guess.
 
@@ -199,7 +199,7 @@ IMAGE_TAG=latest
 - [ ] Submit view: validation mirroring the server, loading state, shows category, priority, AI summary and provider.
 - [ ] Dashboard: pagination, three filters, status control that shows the server's 409 message verbatim.
 - [ ] `nginx.conf` proxying `/api` to the backend, upstream via env (nginx `templates/` + `envsubst`, default `backend:8000`), sets `X-Forwarded-For`. This is your runtime-config answer (ADR 0002).
-- [ ] Frontend `Dockerfile`: `node:22-alpine` build, `nginx:1.27-alpine` serve, listen on 8080, non-root (`USER nginx`, writable cache dir, pid under `/tmp`), `.dockerignore`.
+- [ ] Frontend `Dockerfile`: `node:22-alpine` build, `nginx:1.30.5-alpine3.24` serve, listen on 8080, non-root (`USER nginx`, writable cache dir, pid under `/tmp`), `.dockerignore`.
 
 **Checkpoint (H5):** Ashar's API answers on `localhost:8000` with seeded data. Ali's UI works against the mock. Open the PRs (Issues 1, 2, 3, 5, 7) and review each other's within 15 minutes.
 

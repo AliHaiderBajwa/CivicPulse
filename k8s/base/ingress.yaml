@@ -1,0 +1,29 @@
+# One host, two paths: / -> frontend, /api -> backend.
+# No ingressClassName in base: each environment's default controller serves it
+# (Traefik in k3d, ingress-nginx in the CI kind cluster).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: civicpulse
+  namespace: civicpulse
+  labels:
+    app.kubernetes.io/part-of: civicpulse
+spec:
+  rules:
+    - host: civicpulse.localhost
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: backend
+                port:
+                  number: 8000
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 8080

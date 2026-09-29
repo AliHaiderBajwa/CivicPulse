@@ -1,0 +1,34 @@
+=== H6: VPA recommender (updateMode: Off) — first real-data recommendation ===
+Cluster state: recommender=Running, condition RecommendationProvided=True
+status:
+  conditions:
+  - lastTransitionTime: "2026-09-25T17:03:35Z"
+    status: "True"
+    type: RecommendationProvided
+  observedGeneration: 1
+  recommendation:
+    containerRecommendations:
+    - containerName: backend
+      lowerBound:
+        cpu: 25m
+        memory: 250Mi
+      target:
+        cpu: 93m
+        memory: 250Mi
+      uncappedTarget:
+        cpu: 93m
+        memory: 250Mi
+      upperBound:
+        cpu: 5915m
+        memory: "1967402839"
+
+Applied response (k8s/base/backend.yaml, committed):
+  requests.cpu:   100m -> 93m   (VPA target 93m)
+  requests.memory: 128Mi -> 250Mi (VPA target 250Mi)
+  limits.memory:  512Mi -> 1Gi  (headroom above recommendation)
+
+HPA/VPA conflict: VPA is updateMode Off (recommender only). If VPA were
+allowed to adjust requests while HPA scales on that same CPU request,
+the two controllers would oscillate (VPA raises request -> computed
+utilisation drops -> HPA scales in -> per-pod load rises -> VPA raises
+again). Recommendations are human-applied here; see k8s/base/vpa.yaml.

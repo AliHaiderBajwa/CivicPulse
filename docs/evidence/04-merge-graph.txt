@@ -1,0 +1,14 @@
+*   c37ef00 chore(compose): resolve healthcheck conflict in favour of 5s interval
+|\  
+| *   7c5de58 Merge pull request #20 from AliHaiderBajwa/feat/compose-healthcheck-interval
+| |\  
+| | * ac5bf30 chore(compose): tighten backend healthcheck interval to 5s
+| |/  
+* / 0a69916 chore(compose): relax backend healthcheck interval to 30s
+|/  
+* 07648b1 docs: M7 progress, AI disclosure, CD release-surface evidence
+* cf02f15 fix(ci): scope the deploy-by-SHA guard to our own images
+* 36bce87 ci: align CD with the brief and add release.yml for semver tags
+* 3a0f293 fix(docs): correct the compose hand-off claim and the README quickstart
+* 11d04a5 docs: handoff update + Postgres pod-deletion persistence proof
+* 045aa0b docs: Ashar handoff; chore: reproducible k3d bring-up script

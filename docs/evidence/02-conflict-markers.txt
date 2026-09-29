@@ -1,0 +1,24 @@
+$ git status --short
+UU compose.yaml
+?? docs/evidence/02-conflict-markers.txt
+
+$ sed -n '60,72p' compose.yaml  (conflict markers as left by git)
+      cache:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3).status==200 else 1)"]
+<<<<<<< HEAD
+      interval: 30s
+=======
+      interval: 5s
+>>>>>>> origin/dev
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+$ git diff --check (whitespace errors, expect none besides markers)
+compose.yaml:65: leftover conflict marker
+compose.yaml:67: leftover conflict marker
+compose.yaml:69: leftover conflict marker
+(end)

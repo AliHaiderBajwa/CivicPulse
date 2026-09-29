@@ -1,0 +1,111 @@
+=== CivicPulse /metrics acceptance (issue #17) + F4 hit-rate measurement ===
+Date: 2026-09-26, by Ashar (opencode pair-programmed, disclosed in AI-USAGE).
+Server code: worktree of feat/test-suite @ 103ea6e (= PR #26 head, the branch
+carrying the full working API; dev alone still has 501 route skeletons until
+PR #25 merges). Script under test: scripts/triage_hit_rate.py (this PR).
+All runs local: uvicorn on 127.0.0.1, Postgres cp-pg, Redis db 14, provider
+TRIAGE_PROVIDER=simulated (no network, deterministic).
+
+--------------------------------------------------------------------------------
+[1] F4 - triage content-hash cache hit rate, measured (rubric F4)
+
+$ python scripts/triage_hit_rate.py --base-url http://127.0.0.1:8912 \
+      --uniques 10 --repeats 4
+{
+  "nonce": "d9de79aa",
+  "posts": 40,
+  "post_statuses": [201],
+  "uniques": 10, "repeats": 4,
+  "cache_hits": 30, "cache_misses": 10, "cache_lookups": 40,
+  "hit_rate": 0.75, "expected_hit_rate": 0.75,
+  "fallbacks_during_run": 0,
+  "all_201": true
+}
+exit=0
+
+Reproducibility (second consecutive run, nonce de181517): identical
+30 hits / 10 misses / hit_rate 0.75 / exit=0.
+
+Why exactly 75%: content_key = "triage:v1:{provider}:{sha256(normalised text)}"
+(backend/app/services/triage_orchestrator.py:26) - the first copy of each of
+the 10 distinct texts is a miss, each of the 3 repeats is a hit, so
+expected = (4-1)/4 = 0.75. The script rotates X-Forwarded-For per POST so the
+10/min/client limiter never returns a 429 (report shows all_201=true), and it
+fails (exit 1) unless hits == uniques*(repeats-1), misses == uniques, and the
+fallback counter did not move. Counter deltas are read from GET /metrics
+(triage_cache_total{result="hit"|"miss"}).
+
+--------------------------------------------------------------------------------
+[2] Issue #17 - Prometheus series inventory (brief: request count, latency
+histogram, triage latency, fallback counter)
+
+$ curl -s :8912/metrics | grep '# TYPE'
+# TYPE http_requests_total counter
+# TYPE http_request_duration_seconds histogram
+# TYPE triage_duration_seconds histogram
+# TYPE triage_fallback_total counter
+# TYPE triage_cache_total counter            (bonus: cache lookups)
+
+Wiring: middleware.py:43-44 observes HTTP_REQUESTS/HTTP_LATENCY per request;
+triage_orchestrator.py:50,57 TRIAGE_CACHE hit/miss, :71 TRIAGE_FALLBACKS on
+provider failure only, :74 TRIAGE_LATENCY per triage. Exposition is
+prometheus_client generate_latest() in routes/health.py:43 - no database call,
+and the route carries no Depends, so it cannot enter the POST rate limiter.
+
+--------------------------------------------------------------------------------
+[3] Fallback counter increments exactly when a provider degrades
+
+Boot: TRIAGE_PROVIDER=simulated SIMULATED_FAIL_MODE=raise  (provider ALWAYS
+raises - the assignment's required condition, live in a real process)
+
+$ POST /api/complaints  (X-Forwarded-For: 7.7.7.1)
+HTTP 201 {"category":"roads","priority":"high","triaged_by":"rules:fallback",
+          "triage_latency_ms":2,...}
+
+$ GET /metrics  before: (triage_fallback_total absent - Prometheus creates a
+                         series only on first observation, i.e. from 0)
+$ GET /metrics  after:  triage_fallback_total{error_class="ProviderError",
+                                      provider="simulated"} 1.0
+=> delta exactly +1 for exactly one fallback; the POST still returned 201.
+
+--------------------------------------------------------------------------------
+[4] /metrics is not routed through the rate limiter
+
+Same client (X-Forwarded-For: 9.9.9.9), 12 rapid POST /api/complaints:
+201,201,201,201,201,201,201,201,201,201,429,429
+=> the PDF's 10/minute per client kicks in on POST (11th/12th rejected).
+
+$ GET /metrics  (immediately after those two 429s)  -> HTTP 200
+=> the limiter is a dependency of the complaints router only; /metrics is
+   served regardless of a client having exhausted quota.
+
+--------------------------------------------------------------------------------
+[5] /metrics does not touch Postgres
+
+Runtime proof: boot healthy, then `docker stop cp-pg` under the running app:
+
+GET /health  -> 200                      (liveness: never DB-dependent)
+GET /ready   -> 503 {"status":"degraded","dependencies":{"postgres":false,
+                     "redis":true}}      (readiness takes the hit)
+GET /metrics -> 200
+   series live while DB is down:
+   http_requests_total{method="GET",path="/health",status="200"} 2.0
+   http_requests_total{method="GET",path="/ready",status="503"} 1.0
+docker start cp-pg -> GET /ready 200     (recovery, no restart needed)
+
+Documented behaviour change from the lifespan migration (PR #25 review):
+BOOTING with an unreachable database now fails fast - alembic upgrade head
+raises, uvicorn logs "Application startup failed. Exiting." and exits non-zero.
+That is the sanctioned semantics (Ali's review: "transactional DDL means the
+loser aborts and succeeds on restart" - orchestrators restart until the DB is
+there; cd.yml waits for sts/postgres before the app starts). The degraded-
+serving evidence in evidence/25 [11] remains valid for RUNTIME database death,
+reproduced above.
+
+--------------------------------------------------------------------------------
+[6] How to re-run
+
+docker compose up -d --wait          # or uvicorn app.main:app
+BASE_URL=http://127.0.0.1:8000 python scripts/triage_hit_rate.py
+# exit 0 + hit_rate == (repeats-1)/repeats means F4 holds; any 429, cache
+# miss mismatch, or a fallback during the run makes it exit 1.

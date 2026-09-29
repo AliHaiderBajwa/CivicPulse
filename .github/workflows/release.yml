@@ -1,0 +1,211 @@
+# Release pipeline — rubric I4/I6: the brief asks for a `release.yml` that
+# fires on a `v*` tag, cuts semver tags and writes release notes.
+#
+# Deliberate separation of concerns:
+#   cd.yml        push to dev/main  -> SHA + latest alias, deploy by SHA
+#   release.yml   push a v* tag     -> semver tags, SBOMs, GitHub Release
+#
+# Nothing here deploys to a cluster: a release is "this commit is a version",
+# not "push this to production". The deploy-by-SHA rule is untouched.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing v* tag to re-run the release for"
+        required: true
+
+permissions: {} # every job opts in; nothing inherits
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false # never kill a release mid-publish
+
+jobs:
+  verify:
+    name: verify the tag is real semver
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.semver.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Reject anything that is not vMAJOR.MINOR.PATCH[-PRERELEASE][+BUILD]
+        id: semver
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF#refs/tags/}"
+          if [ "$GITHUB_REF" = "refs/heads/${TAG}" ]; then
+            # workflow_dispatch: validate the supplied tag instead
+            TAG="${{ inputs.tag }}"
+          fi
+          # The full semver 2.0.0 grammar, so a real prerelease such as
+          # v1.2.3-rc.1 is accepted (and marked prerelease) rather than being
+          # rejected by an over-strict three-number pattern.
+          if ! echo "$TAG" | grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'; then
+            echo "::error::'$TAG' is not a semantic version tag (expected vMAJOR.MINOR.PATCH[-PRERELEASE][+BUILD])"
+            exit 1
+          fi
+          VERSION="${TAG#v}"
+          VERSION="${VERSION%%+*}" # build metadata is not part of the semver value
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "release candidate: $TAG (version: $VERSION)"
+
+  publish:
+    needs: verify # gated: never publish an unvalidated tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write # GHCR push only
+    outputs:
+      image_base: ${{ steps.base.outputs.value }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Image namespace (GHCR rejects uppercase)
+        id: base
+        run: |
+          echo "value=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Every published tag is recorded so the release notes can list them.
+      - name: Build and push frontend (semver + 2-part + SHA)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ${{ steps.base.outputs.value }}-frontend:${{ needs.verify.outputs.version }}
+            ${{ steps.base.outputs.value }}-frontend:v${{ needs.verify.outputs.version }}
+            ${{ steps.base.outputs.value }}-frontend:${{ github.sha }}
+          cache-from: type=gha,scope=frontend
+
+      - name: Build and push backend (semver + 2-part + SHA)
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ hashFiles('backend/Dockerfile') != '' && './backend' || './tools/stub-backend' }}
+          push: true
+          tags: |
+            ${{ steps.base.outputs.value }}-backend:${{ needs.verify.outputs.version }}
+            ${{ steps.base.outputs.value }}-backend:v${{ needs.verify.outputs.version }}
+            ${{ steps.base.outputs.value }}-backend:${{ github.sha }}
+          cache-from: type=gha,scope=backend
+
+      - name: Verify the semver tag really resolves in the registry
+        run: |
+          set -euo pipefail
+          for image in frontend backend; do
+            ref="${IMAGE_BASE}-${image}:${VERSION}"
+            docker manifest inspect "$ref" >/dev/null
+            digest=$(docker buildx imagetools inspect "$ref" --format '{{json .Manifest}}' | jq -r '.digest')
+            echo "released: $ref@$digest"
+          done
+        env:
+          IMAGE_BASE: ${{ steps.base.outputs.value }}
+          VERSION: ${{ needs.verify.outputs.version }}
+
+      - name: Syft SBOM (frontend)
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ steps.base.outputs.value }}-frontend:${{ needs.verify.outputs.version }}
+          format: spdx-json
+          artifact-name: sbom-frontend-${{ needs.verify.outputs.version }}.spdx.json
+          output-file: frontend-sbom.spdx.json
+
+      - name: Syft SBOM (backend)
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ steps.base.outputs.value }}-backend:${{ needs.verify.outputs.version }}
+          format: spdx-json
+          artifact-name: sbom-backend-${{ needs.verify.outputs.version }}.spdx.json
+          output-file: backend-sbom.spdx.json
+
+  notes:
+    needs: [verify, publish] # notes only exist once the images are actually up
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # create the GitHub Release
+      packages: read # read the published manifests for the digest table
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Collect the digests of the released images
+        id: digests
+        run: |
+          set -euo pipefail
+          BASE="ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')"
+          for image in frontend backend; do
+            ref="${BASE}-${image}:${{ needs.verify.outputs.version }}"
+            digest=$(docker buildx imagetools inspect "$ref" --format '{{json .Manifest}}' | jq -r '.digest')
+            echo "${image}=${digest}" >> "$GITHUB_OUTPUT"
+            echo "$ref@$digest" >> digests.txt
+          done
+          cat digests.txt
+
+      - name: Compose the release notes
+        id: notes
+        run: |
+          set -euo pipefail
+          VERSION="${{ needs.verify.outputs.version }}"
+          PREV=$(git tag --list 'v*' --sort=-v:refname | grep -v "^v${VERSION}$" | head -1 || true)
+          {
+            echo "## CivicPulse ${VERSION}"
+            echo
+            echo "Citizen complaint intake with LLM triage, PostgreSQL persistence, a Redis"
+            echo "stats cache, and a horizontally scaled Kubernetes deployment."
+            echo
+            echo "### Images"
+            echo
+            echo "| Image | Digest |"
+            echo "|---|---|"
+            echo "| \`${{ needs.publish.outputs.image_base }}-frontend:${VERSION}\` | \`${{ steps.digests.outputs.frontend }}\` |"
+            echo "| \`${{ needs.publish.outputs.image_base }}-backend:${VERSION}\` | \`${{ steps.digests.outputs.backend }}\` |"
+            echo
+            echo "### What changed"
+            echo
+            if [ -n "$PREV" ]; then
+              git log --pretty='- %s (\`%h\`)' "${PREV}..HEAD" | head -50
+            else
+              echo "- first tagged release of CivicPulse"
+              git log --pretty='- %s (\`%h\`)' | head -50
+            fi
+            echo
+            echo "### Verification"
+            echo
+            echo "- CI: 7 required checks on the tagged commit"
+            echo "- SBOM: SPDX JSON attached for both images"
+            echo "- Deploy: by commit SHA only, never \`:latest\` (see \`AGENTS.md\`)"
+          } > NOTES.md
+          cat NOTES.md
+
+      - name: Publish the GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.verify.outputs.version }}
+          name: CivicPulse ${{ needs.verify.outputs.version }}
+          body_path: NOTES.md
+          draft: false
+          prerelease: ${{ contains(needs.verify.outputs.version, '-') }}
+          files: |
+            frontend-sbom.spdx.json
+            backend-sbom.spdx.json

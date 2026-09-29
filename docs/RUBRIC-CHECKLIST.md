@@ -3,89 +3,89 @@
 One box per rubric line. Tick only when **evidence exists** (code, screenshot, link, or doc section).
 
 ## A · Collaboration and version control — 15
-- [ ] A1 main protected: no direct push, PR required, CI required, ≥1 approval; screenshot in docs/evidence/ — 3
-- [ ] A2 two-branch model (dev + feature branches); no work committed directly to main — 2
-- [ ] A3 ≥5 merged PRs, each linked to an Issue, each with a substantive review comment from partner — 4
-- [ ] A4 ≥35 commits, conventional prefixes, neither partner below 35% (git shortlog -sn) — 3
-- [ ] A5 one deliberate merge conflict on real code, resolved, with markers/resolution/merge evidence + 2–4 sentences on why that version won — 3
+- [x] A1 main protected: no direct push, PR required, CI required, ≥1 approval; screenshot in docs/evidence/ — 3 (evidence/30: live API output — PR required, 1 approval, dismiss-stale, 7 required checks, no force pushes/deletions)
+- [x] A2 two-branch model (dev + feature branches); no work committed directly to main — 2 (evidence/29: main = 3 Block-0 commits, `rev-list main --not dev` = 0)
+- [x] A3 ≥5 merged PRs, each linked to an Issue, each with a substantive review comment from partner — 4 (evidence/29: 10 qualifying PRs, verbatim quotes)
+- [x] A4 ≥35 commits, conventional prefixes, neither partner below 35% (git shortlog -sn) — 3 (87 commits on dev at 1f5470b: Ashar Ahmed 46 = 52.9%, Ali Haider Bajwa 41 = 47.1% — both ≥35, both ≥35%; conventional prefixes throughout)
+- [x] A5 one deliberate merge conflict on real code, resolved, with markers/resolution/merge evidence + 2–4 sentences on why that version won — 3 (PR #20 Ashar 5s + PR #21 Ali 30s→resolved 5s, approved by ashar1x, merged 4e1d80d; docs/evidence/02–04; rationale in #21 body + c37ef00)
 
 ## B · Frontend — 18
-- [ ] B1 Submit view: validation, honest loading state, renders category, priority, AI summary and provider — 5
-- [ ] B2 Dashboard: pagination, filters, status transitions, server's 409 message verbatim — 5
-- [ ] B3 Stats view rendering aggregates and cache-hit state from X-Cache — 3
-- [ ] B4 runtime config — no baked-in API URL; one image runs in any environment — 3
-- [ ] B5 ≥5 meaningful component tests passing in CI — 2
+- [x] B1 Submit view: validation, honest loading state, renders category, priority, AI summary and provider — 5
+- [x] B2 Dashboard: pagination, filters, status transitions, server's 409 message verbatim — 5
+- [x] B3 Stats view rendering aggregates and cache-hit state from X-Cache — 3
+- [x] B4 runtime config — no baked-in API URL; one image runs in any environment — 3
+- [x] B5 ≥5 meaningful component tests passing in CI — 2
 
 ## C · Backend — 25
-- [ ] C1 all endpoints to contract, correct status codes, field-level validation errors — 7
-- [ ] C2 four-layer separation: no SQL outside repositories, no business rules in routes — 4
-- [ ] C3 status state machine as explicit transition table; invalid transitions 409 — 3
-- [ ] C4 /health and /ready correctly distinguished; /health does not touch the database — 3
-- [ ] C5 structured JSON logging to stdout with propagated request_id — 3
-- [ ] C6 SIGTERM handled: in-flight requests drain before exit — 2
-- [ ] C7 ≥14 backend tests, unit and integration, deterministic, coverage ≥65% — 3
+- [x] C1 all endpoints to contract, correct status codes, field-level validation errors — 7 (all 8 contract paths exercised; contract diff EMPTY after routes; evidence/25 §2–7)
+- [x] C2 four-layer separation: no SQL outside repositories, no business rules in routes — 4 (evidence/25 §10: only SQL sites are in repositories; routes are HTTP↔service only)
+- [x] C3 status state machine as explicit transition table; invalid transitions 409 — 3 (domain.py TRANSITIONS; evidence/25 §4: 409 verbatim ×2 incl. terminal state)
+- [x] C4 /health and /ready correctly distinguished; /health does not touch the database — 3 (evidence/25 §11: dead DB → /health 200, /ready 503 degraded)
+- [x] C5 structured JSON logging to stdout with propagated request_id — 3
+- [x] C6 SIGTERM handled: in-flight requests drain before exit — 2 (evidence/26 §3: SIGTERM at +0.7s, in-flight POST finished 201 at 5.2s, pools closed after, exit=0)
+- [x] C7 ≥14 backend tests, unit and integration, deterministic, coverage ≥65% — 3 (76 tests across 14 files, 91.90% coverage, five consecutive zero-flake runs, CI-environment simulation with fakeredis absent; evidence/27)
 
 ## D · Data layer — 12
-- [ ] D1 Alembic migrations; zero schema DDL in application startup code — 4
-- [ ] D2 schema complete incl. triaged_by, ai_summary, triage_latency_ms, timestamptz — 3
-- [ ] D3 two indexes, each justified by a named query in notes — 2
-- [ ] D4 idempotent seed of ≥30 realistic complaints; running twice changes nothing — 3
+- [x] D1 Alembic migrations; zero schema DDL in application startup code — 4 (evidence/23: upgrade head → downgrade base → upgrade head all exit 0; grep `CREATE TABLE|ALTER TABLE|DROP TABLE` over backend/app returns nothing — the lifespan only invokes `alembic upgrade head`)
+- [x] D2 schema complete incl. triaged_by, ai_summary, triage_latency_ms, timestamptz — 3 (evidence/23 §psql \d: all columns + triaged_by CHECK incl. `simulated`, summary ≤140, timestamptz created_at/updated_at with now() defaults)
+- [x] D3 two indexes, each justified by a named query in notes — 2 (ENGINEERING-NOTES "Reason for each index": `ix_complaints_created_at` ← feed ORDER BY at complaint_repository.py:42; `ix_complaints_status_priority` ← filtered queue at :35-39; schema in evidence/23)
+- [x] D4 idempotent seed of ≥30 realistic complaints; running twice changes nothing — 3 (evidence/23: run 1 inserted 34, run 2 inserted 0/skipped 34; 34 rows, 6 categories, 4 statuses; uuid5 + ON CONFLICT)
 
 ## E · Cache layer — 10
-- [ ] E1 /api/stats read-through cache, 30 s TTL, correct X-Cache header — 3
-- [ ] E2 cache invalidated on write, not left to expire — 2
-- [ ] E3 distributed Redis rate limiter on POST /api/complaints, 429 with Retry-After — 4
-- [ ] E4 Redis AOF on a named volume, justification written down — 1
+- [x] E1 /api/stats read-through cache, 30 s TTL, correct X-Cache header — 3 (evidence/25 §2: MISS→HIT, stats_ttl_s=30, header on every 200)
+- [x] E2 cache invalidated on write, not left to expire — 2 (evidence/25 §2: MISS immediately after create, before TTL expiry)
+- [x] E3 distributed Redis rate limiter on POST /api/complaints, 429 with Retry-After — 4 (evidence/25 §3: 3 allowed, 4th 429 + retry-after: 60, Redis-backed window)
+- [x] E4 Redis AOF on a named volume, justification written down — 1 (compose.yaml:101-105 `--appendonly yes` + named `redisdata` + rationale comment; evidence/26 §4)
 
 ## F · AI layer — 25
-- [ ] F1 TriageProvider interface with ≥3 working implementations selected by env var — 5
-- [ ] F2 structured output requested and validated against Pydantic schema; malformed output rejected safely — 5
-- [ ] F3 timeout, single jittered retry on retryable errors only, fallback to rules, triaged_by recorded — 6
-- [ ] F4 content-hash caching of triage results with measured, reported hit rate — 3
-- [ ] F5 prompt-injection guardrail plus a test submitting an injection attempt — 3
-- [ ] F6 triage_latency_ms recorded and surfaced through /api/meta/providers — 2
-- [ ] F7 PII/data-governance ADR: what leaves machine, to whom, why acceptable — 1
+- [x] F1 TriageProvider interface with ≥3 working implementations selected by env var — 5 (rules/simulated/llm/ollama via TRIAGE_PROVIDER; evidence/24 factory + per-provider checks)
+- [x] F2 structured output requested and validated against Pydantic schema; malformed output rejected safely — 5 (evidence/24: parse_triage rejects bad category/confidence; malformed → ProviderError → fallback, never retried)
+- [x] F3 timeout, single jittered retry on retryable errors only, fallback to rules, triaged_by recorded — 6 (evidence/24: 503 retried once with jitter, 401/400 not retried, timeout retried; evidence/25 §6 rules:fallback + triaged_by)
+- [x] F4 content-hash caching of triage results with measured, reported hit rate — 3 (`scripts/triage_hit_rate.py` shipped in PR #27 + docs/evidence/28 [1]: hit_rate 0.75 = 30 hits/10 misses/40 lookups, expected (4−1)/4, two identical runs; reported in docs/TRIAGE.md §3 and ENGINEERING-NOTES "measured cache hit rate"; mechanism in evidence/24)
+- [x] F5 prompt-injection guardrail plus a test submitting an injection attempt — 3 (evidence/24: tag-early injection attempt cannot escape the tag)
+- [x] F6 triage_latency_ms recorded and surfaced through /api/meta/providers — 2 (evidence/25 §5: recent_triages[].latency_ms populated per outcome)
+- [x] F7 PII/data-governance ADR: what leaves machine, to whom, why acceptable — 1 (docs/adr/0004-pii-and-data-governance.md: per-provider egress table, reporter_contact structurally never passed (complaint_service.py:21), redaction before egress (triage_orchestrator.py:42), SecretStr key)
 
 ## G · Docker and Compose — 15
-- [ ] G1 both images multi-stage, pinned base, non-root USER, exec-form CMD, cache-correct layer order — 4
-- [ ] G2 .dockerignore per build context, before/after context sizes reported — 2
-- [ ] G3 two networks with internal: true; frontend provably cannot reach database — 4
-- [ ] G4 three named volumes, each justified; dev bind mount present and absent from prod — 2
-- [ ] G5 healthchecks on all services with depends_on: condition: service_healthy — 2
-- [ ] G6 compose.prod.yaml uses image: ${IMAGE_TAG}, no build:, no published DB or cache port — 1
+- [x] G1 both images multi-stage, pinned base, non-root USER, exec-form CMD, cache-correct layer order — 4 (frontend from M2; backend evidence/26 §1: python:3.12.13-slim-bookworm, USER 10001, venv layer before app COPY, 74.1 MB)
+- [x] G2 .dockerignore per build context, before/after context sizes reported — 2 (evidence/26 §2: backend 0.07 MB vs 195.72 MB, frontend 0.21 MB vs 110.5 MB)
+- [x] G3 two networks with internal: true; frontend provably cannot reach database — 4
+- [x] G4 three named volumes, each justified; dev bind mount present and absent from prod — 2
+- [x] G5 healthchecks on all services with depends_on: condition: service_healthy — 2
+- [x] G6 compose.prod.yaml uses image: ${IMAGE_TAG}, no build:, no published DB or cache port — 1
 
 ## H · Kubernetes — 20
-- [ ] H1 namespace, Deployments, StatefulSet+PVC for Postgres, ClusterIP Services, Ingress routing / and /api — 5
-- [ ] H2 ConfigMap and Secret separated; committed manifests carry placeholders only — 2
-- [ ] H3 all three probes correct: liveness independent of DB, readiness dependent — 4
-- [ ] H4 resources.requests and limits set on every container — 2
-- [ ] H5 HPA v2 with tuned behavior + captured kubectl get hpa -w output + replicas-vs-load chart from real load test — 4
-- [ ] H6 VPA recommender mode, recommendations committed, requests updated in response, HPA/VPA conflict explained — 3
+- [x] H1 namespace, Deployments, StatefulSet+PVC for Postgres, ClusterIP Services, Ingress routing / and /api — 5
+- [x] H2 ConfigMap and Secret separated; committed manifests carry placeholders only — 2
+- [x] H3 all three probes correct: liveness independent of DB, readiness dependent — 4
+- [x] H4 resources.requests and limits set on every container — 2
+- [x] H5 HPA v2 with tuned behavior + captured kubectl get hpa -w output + replicas-vs-load chart from real load test — 4
+- [x] H6 VPA recommender mode, recommendations committed, requests updated in response, HPA/VPA conflict explained — 3
 
 ## I · CI/CD — 20
-- [ ] I1 ci.yml lint+typecheck+tests on every PR, configured as required checks — 4
-- [ ] I2 compose integration smoke job asserting real request path end to end — 3
-- [ ] I3 Trivy image scan and kubeconform manifest validation in CI — 3
-- [ ] I4 cd.yml with needs: gating publish, images pushed to GHCR tagged by commit SHA — 4
-- [ ] I5 Kubernetes deploy job on ephemeral cluster, waiting on rollout status and smoke-testing the Ingress — 3
-- [ ] I6 secrets from GitHub Secrets with scoped token and least-privilege permissions: block — 2
-- [ ] I7 evidence of a red pipeline blocking a merge, then green — 1
+- [x] I1 ci.yml lint+typecheck+tests on every PR, configured as required checks — 4
+- [x] I2 compose integration smoke job asserting real request path end to end — 3
+- [x] I3 Trivy image scan and kubeconform manifest validation in CI — 3
+- [x] I4 cd.yml with needs: gating publish, images pushed to GHCR tagged by commit SHA — 4
+- [x] I5 Kubernetes deploy job on ephemeral cluster, waiting on rollout status and smoke-testing the Ingress — 3
+- [x] I6 secrets from GitHub Secrets with scoped token and least-privilege permissions: block — 2
+- [x] I7 evidence of a red pipeline blocking a merge, then green — 1
 
 ## J · Documentation, portfolio and reflection — 15
-- [ ] J1 README.md: problem statement, badges, Mermaid architecture diagram, working one-command quickstart, API table, screenshots — 4
-- [ ] J2 four ADRs: provider interface; frontend runtime config; deploy-by-SHA; PII/data governance — 4
-- [ ] J3 docs/RUNBOOK.md: deploy, roll back, read logs, what to do when triage starts failing — 2
+- [x] J1 README.md: problem statement, badges, Mermaid architecture diagram, working one-command quickstart, API table, screenshots — 4 (badges CI/CD; quickstart is plain `docker compose up`, stub footnoted; screenshots 31/32 are live-k3d browser captures)
+- [x] J2 four ADRs: provider interface; frontend runtime config; deploy-by-SHA; PII/data governance — 4 (0001/0002/0003/0004, each with context/decision/alternatives/consequences + file:line refs)
+- [x] J3 docs/RUNBOOK.md: deploy, roll back, read logs, what to do when triage starts failing — 2 (deploy ×3 paths, undo vs SHA re-apply with the migrations-only-forward rule, log recipes incl. --previous + request_id tracing + triage section)
 - [ ] J4 demo video ≤5 minutes, both partners speaking: clean clone → running system, AI triage, fallback, network isolation failing, HPA scaling, rollback — 3
-- [ ] J5 docs/ENGINEERING-NOTES.md answering all eight §5.2 questions with file-and-line references — 2
+- [x] J5 docs/ENGINEERING-NOTES.md answering all eight §5.2 questions with file-and-line references — 2 (Q1-3,5-7 Ali; Q4,8 Ashar; index/volume/hit-rate/Groq/context appendices; zero _pending_ remain)
 
 ## Bonus — capped at +15
-- [ ] BN1 zero-downtime rolling update under live load, zero failed requests — +4
+- [x] BN1 zero-downtime rolling update under live load, zero failed requests — +4 (k6: 15 VUs × 150 s, rollout restart at T+50 s, 0/12068 failed, 100% checks; strategy maxUnavailable 0 pre-existing; evidence/34)
 - [ ] BN2 GitOps (Argo CD or Flux) reconciling cluster from repo — +4
-- [ ] BN3 deploy by image digest + Cosign signing/verification in CI — +3
+- [x] BN3 deploy by image digest + Cosign signing/verification in CI — +3 (keyless Fulcio/Rekor signatures bound to digests, verified in-job; dispatch run 36316718561 all green; evidence/35)
 - [ ] BN4 Prometheus scraping /metrics + Grafana dashboard screenshot — +2
 - [ ] BN5 OpenTelemetry tracing frontend→backend→LLM — +2
 
 ## Submission gate (run before submitting)
-- [ ] `python3 scripts/check_submission.py` clean
-- [ ] no `.env` in git history
+- [x] `python3 scripts/check_submission.py` clean
+- [x] no `.env` in git history (proved by `scripts/check_submission.py` checks 1-2)
 - [ ] cd.yml success link · GHCR SHA image links · video link · shortlog · hpa capture + chart

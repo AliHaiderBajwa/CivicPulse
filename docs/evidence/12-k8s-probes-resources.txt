@@ -1,0 +1,58 @@
+=== H1: namespace, workloads, services, ingress ===
+NAME         STATUS   AGE
+civicpulse   Active   45m
+NAME                       READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS   IMAGES                                           SELECTOR
+deployment.apps/backend    10/10   10           10          45m   backend      ghcr.io/alihaiderbajwa/civicpulse-backend:dev    app=backend
+deployment.apps/frontend   2/2     2            2           45m   frontend     ghcr.io/alihaiderbajwa/civicpulse-frontend:dev   app=frontend
+deployment.apps/redis      1/1     1            1           45m   redis        redis:7-alpine                                   app=cache
+
+NAME                        READY   AGE   CONTAINERS   IMAGES
+statefulset.apps/postgres   1/1     45m   postgres     postgres:16-alpine
+
+NAME               TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE   SELECTOR
+service/backend    ClusterIP   10.43.2.87      <none>        8000/TCP   45m   app=backend
+service/cache      ClusterIP   10.43.196.211   <none>        6379/TCP   45m   app=cache
+service/database   ClusterIP   10.43.65.182    <none>        5432/TCP   45m   app=database
+service/frontend   ClusterIP   10.43.229.114   <none>        8080/TCP   45m   app=frontend
+
+NAME                                   CLASS    HOSTS                  ADDRESS      PORTS   AGE
+ingress.networking.k8s.io/civicpulse   <none>   civicpulse.localhost   172.22.0.2   80      45m
+
+NAME                                 MIN AVAILABLE   MAX UNAVAILABLE   ALLOWED DISRUPTIONS   AGE
+poddisruptionbudget.policy/backend   1               N/A               9                     45m
+
+NAME                                          REFERENCE            TARGETS         MINPODS   MAXPODS   REPLICAS   AGE
+horizontalpodautoscaler.autoscaling/backend   Deployment/backend   cpu: 109%/60%   2         10        10         45m
+
+NAME                                                   MODE   CPU   MEM     PROVIDED   AGE   MINREPLICAS   OOMSECONDS
+verticalpodautoscaler.autoscaling.k8s.io/backend-vpa   Off    93m   250Mi   True       36m                 
+
+=== H3: probe configuration (startup / liveness / readiness) ===
+-- backend
+startup:  path=/health port=http failureThreshold=30
+   liveness:  path=/health port=http period=10
+   readiness: path=/ready port=http period=5
+-- frontend
+startup:  path=/healthz port=http failureThreshold=30
+   liveness:  path=/healthz port=http period=10
+   readiness: path=/healthz port=http period=5
+-- postgres (exec pg_isready — liveness must not route via backend)
+liveness=["pg_isready","-U","civicpulse","-d","civicpulse"] readiness=["pg_isready","-U","civicpulse","-d","civicpulse"]
+Rationale: liveness = /health (process alive, NO database call); readiness = /ready (DB-dependent). Killing a slow DB must not restart pods.
+
+=== H4: resources.requests / limits on every container ===
+POD                         CONTAINER   CPU_REQ   CPU_LIM   MEM_REQ   MEM_LIM
+backend-58f445d5b8-7267x    backend     100m      1         128Mi     512Mi
+backend-58f445d5b8-8vsms    backend     100m      1         128Mi     512Mi
+backend-58f445d5b8-9n67m    backend     100m      1         128Mi     512Mi
+backend-58f445d5b8-h2jfp    backend     100m      1         128Mi     512Mi
+backend-58f445d5b8-l2dm2    backend     100m      1         128Mi     512Mi
+backend-58f445d5b8-mhsnx    backend     100m      1         128Mi     512Mi
+backend-58f445d5b8-pnrv7    backend     100m      1         128Mi     512Mi
+backend-58f445d5b8-q8flb    backend     100m      1         128Mi     512Mi
+backend-58f445d5b8-qnbgk    backend     100m      1         128Mi     512Mi
+backend-58f445d5b8-vkv2k    backend     100m      1         128Mi     512Mi
+frontend-7bf566899f-4gbd7   frontend    50m       250m      64Mi      128Mi
+frontend-7bf566899f-zw78t   frontend    50m       250m      64Mi      128Mi
+postgres-0                  postgres    100m      1         128Mi     512Mi
+redis-7d48bd7cfd-hgsp4      redis       50m       250m      64Mi      256Mi

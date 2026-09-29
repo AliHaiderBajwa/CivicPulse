@@ -1,0 +1,416 @@
+# CD pipeline — rubric I4 (needs: gated, GHCR by commit SHA), I5 (ephemeral
+# cluster deploy + rollout status + Ingress smoke), I6 (scoped tokens, secrets).
+#
+# Chain: build -> publish -> deploy-k8s. No job may publish or deploy without
+# the previous stage succeeding, and no job runs on a pull_request from a fork.
+name: cd
+
+on:
+  push:
+    branches: [dev, main]
+  workflow_dispatch:
+
+# Nothing by default: every job opts into exactly the scopes it needs (I6).
+permissions: {}
+
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: false # never kill a deploy mid-flight
+
+jobs:
+  # The brief specifies test -> build-push (needs: test). CI already runs the
+  # same suites on the push, but a CD pipeline that can publish an untested
+  # commit is not a gated pipeline, so the gate is repeated here explicitly.
+  test:
+    name: test (gate)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    # Same disposable services as ci.yml's test-backend: the suite needs a
+    # real Postgres and Redis (conftest's guard admits CI's suffix-less DB).
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: civicpulse
+          # Ephemeral throwaway credential for this disposable service container,
+          # identical to ci.yml's: PostgreSQL requires a password env here and
+          # a fork-safe workflow must not depend on a repo secret. Not a real
+          # secret, never reused anywhere, lives for the length of one job.
+          POSTGRES_PASSWORD: civicpulse # NOSONAR
+          POSTGRES_DB: civicpulse
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+    env:
+      # Same disposable service credential as POSTGRES_PASSWORD above (and as
+      # ci.yml): ephemeral container, job-scoped, never a real secret.
+      DATABASE_URL: postgresql+psycopg://civicpulse:civicpulse@localhost:5432/civicpulse # NOSONAR
+      REDIS_URL: redis://localhost:6379/0
+      TRIAGE_PROVIDER: simulated
+      RATE_LIMIT_PER_MIN: "1000"
+      LOG_LEVEL: INFO
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Backend suite
+        if: hashFiles('backend/pyproject.toml') != ''
+        run: |
+          set -euo pipefail
+          # Behavioural parity with ci.yml test-backend, with the installs
+          # tightened for the security gate: requirements.lock is the uv-compiled
+          # full closure with SHA-256 hashes (same flags the Dockerfile uses), so
+          # there is no unlocked resolver step at all, and the test tools are
+          # pinned to the versions CI resolved green on this commit. pyproject is
+          # tool-config only (no [project] table) - its editable install fails by
+          # design, so it is not attempted here; requirements.lock is the source.
+          python -m pip install --quiet --only-binary :all: --no-deps --require-hashes -r backend/requirements.lock
+          python -m pip install --quiet --only-binary :all: pytest==9.1.1 pytest-cov==7.1.0 httpx==0.28.1
+          cd backend
+          alembic upgrade head || true
+          python -m app.seed || true
+          pytest --cov=app --cov-fail-under=65 -q
+
+      - name: Frontend suite
+        run: |
+          set -euo pipefail
+          cd frontend
+          npm ci
+          npm test
+
+  build:
+    needs: test # gated: never build an untested commit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    outputs:
+      image_base: ${{ steps.base.outputs.value }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Image namespace (GHCR rejects uppercase)
+        id: base
+        run: |
+          echo "value=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build frontend (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: false
+          tags: ${{ steps.base.outputs.value }}-frontend:${{ github.sha }}
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+
+      - name: Build backend (real backend once backend/ lands, stub until then)
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ hashFiles('backend/Dockerfile') != '' && './backend' || './tools/stub-backend' }}
+          push: false
+          tags: ${{ steps.base.outputs.value }}-backend:${{ github.sha }}
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+  publish:
+    needs: build # gated: never publish without a successful build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20 # Cosign sign + verify add ~2 min
+    permissions:
+      contents: read
+      packages: write # least privilege: push to GHCR only
+      id-token: write # keyless Cosign signing via Fulcio OIDC (BN3)
+    outputs:
+      image_base: ${{ needs.build.outputs.image_base }} # forwarded for deploy
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR with the scoped GITHUB_TOKEN
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # The brief asks for GHCR to carry the commit SHA *and* `latest`. The
+      # AGENTS.md rule is about what we DEPLOY, not what we publish: `latest` is
+      # a convenience alias so humans and downstream users can pull by name, while
+      # deploy-k8s still rewrites the overlay to the SHA and nothing else.
+      - name: Push frontend (SHA + latest alias)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ${{ needs.build.outputs.image_base }}-frontend:${{ github.sha }}
+            ${{ needs.build.outputs.image_base }}-frontend:latest
+          cache-from: type=gha,scope=frontend
+
+      - name: Push backend (SHA + latest alias)
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ hashFiles('backend/Dockerfile') != '' && './backend' || './tools/stub-backend' }}
+          push: true
+          tags: |
+            ${{ needs.build.outputs.image_base }}-backend:${{ github.sha }}
+            ${{ needs.build.outputs.image_base }}-backend:latest
+          cache-from: type=gha,scope=backend
+
+      - name: Assert both SHA tags exist in the registry
+        run: |
+          set -euo pipefail
+          for image in frontend backend; do
+            ref="${IMAGE_BASE}-${image}:${GITHUB_SHA}"
+            docker manifest inspect "$ref" >/dev/null
+            echo "published: $ref"
+          done
+        env:
+          IMAGE_BASE: ${{ needs.build.outputs.image_base }}
+
+      - name: Record the digests (deploy is by digest-addressable SHA)
+        run: |
+          set -euo pipefail
+          for image in frontend backend; do
+            ref="${IMAGE_BASE}-${image}:${GITHUB_SHA}"
+            digest=$(docker buildx imagetools inspect "$ref" --format '{{json .Manifest}}' | jq -r '.digest')
+            echo "digest: $ref@$digest"
+            echo "### \`$ref\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "$ref@$digest" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "$digest" > "/tmp/${image}.digest"
+          done
+        env:
+          IMAGE_BASE: ${{ needs.build.outputs.image_base }}
+
+      - name: Syft SBOM (frontend)
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ needs.build.outputs.image_base }}-frontend:${{ github.sha }}
+          format: spdx-json
+          artifact-name: sbom-frontend-${{ github.sha }}.spdx.json
+          output-file: frontend-sbom.spdx.json
+
+      - name: Syft SBOM (backend)
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ needs.build.outputs.image_base }}-backend:${{ github.sha }}
+          format: spdx-json
+          artifact-name: sbom-backend-${{ github.sha }}.spdx.json
+          output-file: backend-sbom.spdx.json
+
+      - name: Install Cosign (pinned release, keyless-only usage)
+        # Full commit SHA of the moving `v3` tag (S7637: tag refs are
+        # mutable, the digest-bound signing step below must not be):
+        uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
+        with:
+          cosign-release: v2.4.1
+
+      # BN3: keyless signatures (Fulcio OIDC + Rekor transparency log) bound
+      # to the exact digests we deploy, not to tags: even if a tag were ever
+      # moved, the signature stays pinned to the tested bytes.
+      - name: Sign both images with Cosign (keyless, by digest)
+        run: |
+          set -euo pipefail
+          for image in frontend backend; do
+            ref="${IMAGE_BASE}-${image}:${GITHUB_SHA}"
+            digest=$(docker buildx imagetools inspect "$ref" --format '{{json .Manifest}}' | jq -r '.digest')
+            echo "signing: $ref@$digest"
+            cosign sign --yes "$ref@$digest"
+            echo "### signature: \`$ref@$digest\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+          done
+        env:
+          IMAGE_BASE: ${{ needs.build.outputs.image_base }}
+
+      - name: Verify both signatures (proves the Fulcio/Rekor chain in CI)
+        run: |
+          set -euo pipefail
+          for image in frontend backend; do
+            ref="${IMAGE_BASE}-${image}:${GITHUB_SHA}"
+            digest=$(docker buildx imagetools inspect "$ref" --format '{{json .Manifest}}' | jq -r '.digest')
+            cosign verify \
+              --certificate-identity-regexp '^https://github.com/AliHaiderBajwa/CivicPulse/' \
+              --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+              "$ref@$digest" > /dev/null
+            echo "verified: $ref@$digest"
+          done
+        env:
+          IMAGE_BASE: ${{ needs.build.outputs.image_base }}
+
+  deploy-k8s:
+    needs: publish # gated: deploy only after the SHA images are published
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      packages: read # pull our own freshly pushed images, nothing more
+    env:
+      KIND_VERSION: v0.30.0
+      INGRESS_NGINX_KIND: https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.12.1/deploy/static/provider/kind/deploy.yaml
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install kind (pinned)
+        run: |
+          curl -fsSL -o /tmp/kind "https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-amd64"
+          chmod +x /tmp/kind && sudo mv /tmp/kind /usr/local/bin/kind
+          kind version
+
+      - name: Create ephemeral cluster (host :80 -> Ingress)
+        run: |
+          cat > /tmp/kind-config.yaml <<'EOF'
+          kind: Cluster
+          apiVersion: kind.x-k8s.io/v1alpha4
+          name: civicpulse
+          nodes:
+            - role: control-plane
+              extraPortMappings:
+                - containerPort: 80
+                  hostPort: 80
+                  protocol: TCP
+          EOF
+          kind create cluster --config /tmp/kind-config.yaml --wait 120s
+
+      - name: Install ingress-nginx (kind provider, pinned)
+        run: |
+          kubectl label node civicpulse-control-plane ingress-ready=true --overwrite
+          kubectl apply -f "$INGRESS_NGINX_KIND"
+          kubectl -n ingress-nginx rollout status deploy/ingress-nginx-controller --timeout=180s
+
+      - name: Load the published SHA images into kind
+        run: |
+          set -euo pipefail
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker pull "${IMAGE_BASE}-frontend:${SHA}"
+          docker pull "${IMAGE_BASE}-backend:${SHA}"
+          kind load docker-image "${IMAGE_BASE}-frontend:${SHA}" "${IMAGE_BASE}-backend:${SHA}" --name civicpulse
+        env:
+          IMAGE_BASE: ${{ needs.publish.outputs.image_base }}
+          SHA: ${{ github.sha }}
+
+      - name: Install the VPA CRD first (kubectl cannot map a CR in the same stream)
+        run: |
+          set -euo pipefail
+          kubectl apply -k k8s/crds
+          kubectl wait --for=condition=Established --timeout=60s \
+            crd/verticalpodautoscalers.autoscaling.k8s.io
+          kubectl get crd | grep autoscaling.k8s.io
+
+      - name: Deploy overlay at commit SHA (dev on dev, prod on main)
+        run: |
+          set -euo pipefail
+          OVERLAY=dev
+          if [ "${GITHUB_REF}" = "refs/heads/main" ]; then OVERLAY=prod; fi
+          # The overlays carry the `images:` transformers with a placeholder tag
+          # (dev / prod-0000000). Rewriting the tag is the deploy-by-SHA step --
+          # never :latest (AGENTS.md hard rule).
+          sed -i -E "s|newTag: .*|newTag: ${SHA}|" "k8s/overlays/${OVERLAY}/kustomization.yaml"
+          kubectl kustomize "k8s/overlays/${OVERLAY}" > /tmp/manifest.yaml
+          grep -E '^\s+image:' /tmp/manifest.yaml
+          # Guard the -8 "deploying :latest" deduction at the point of truth: the
+          # rendered manifest is the thing kubectl is about to apply, so assert on
+          # it rather than trusting the sed above.
+          #
+          # Scope matters: the manifest also carries third-party base images
+          # (postgres:16-alpine, redis:7-alpine) which are correctly pinned by
+          # upstream tag and have no business carrying our commit SHA. Only the
+          # images we publish are held to the deploy-by-SHA rule.
+          if grep -E '^\s+image:' /tmp/manifest.yaml | grep -q ':latest'; then
+            echo "::error::rendered manifest pins :latest -- refusing to deploy"
+            grep -E '^\s+image:' /tmp/manifest.yaml
+            exit 1
+          fi
+          if ! grep -E '^\s+image:' /tmp/manifest.yaml | grep "${IMAGE_BASE}" | grep -q ":${SHA}$"; then
+            echo "::error::no ${IMAGE_BASE} image is pinned to the commit SHA ${SHA}"
+            grep -E '^\s+image:' /tmp/manifest.yaml
+            exit 1
+          fi
+          if grep -E '^\s+image:' /tmp/manifest.yaml | grep "${IMAGE_BASE}" | grep -qv ":${SHA}$"; then
+            echo "::error::an ${IMAGE_BASE} image is not pinned to ${SHA} -- refusing to deploy"
+            grep -E '^\s+image:' /tmp/manifest.yaml | grep "${IMAGE_BASE}"
+            exit 1
+          fi
+          echo "deploy-by-SHA assertion passed: every ${IMAGE_BASE} image is pinned to ${SHA}"
+          kubectl apply -f /tmp/manifest.yaml
+          # Base carries no ingressClassName (each environment's default
+          # controller serves it); name the kind controller explicitly.
+          kubectl -n civicpulse patch ingress civicpulse --type=merge \
+            -p '{"spec":{"ingressClassName":"nginx"}}'
+          # Secret placeholders are committed on purpose; the live values are
+          # created here from GitHub Secrets and a fresh random DB password.
+          PW="$(openssl rand -hex 12)"
+          kubectl create secret generic civicpulse-secrets \
+            --namespace civicpulse \
+            --from-literal=POSTGRES_PASSWORD="$PW" \
+            --from-literal="DATABASE_URL=postgresql+psycopg://civicpulse:${PW}@database:5432/civicpulse" \
+            --from-literal="LLM_API_KEY=${LLM_API_KEY}" \
+            --dry-run=client -o yaml | kubectl replace -f -
+          # Key names only -- values are never echoed into the log.
+          kubectl -n civicpulse get secret civicpulse-secrets -o json \
+            | jq -r '.data | keys[]' | sed 's/^/secret key: /'
+        env:
+          IMAGE_BASE: ${{ needs.publish.outputs.image_base }}
+          SHA: ${{ github.sha }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+
+      - name: Wait for rollout (deployments + statefulset)
+        run: |
+          set -euo pipefail
+          kubectl -n civicpulse rollout status deploy/backend --timeout=180s
+          kubectl -n civicpulse rollout status deploy/frontend --timeout=180s
+          kubectl -n civicpulse rollout status sts/postgres --timeout=180s
+          kubectl -n civicpulse rollout status deploy/redis --timeout=180s
+          kubectl -n civicpulse get pods -o wide
+
+      - name: Smoke the Ingress end to end
+        run: |
+          set -euo pipefail
+          H='Host: civicpulse.localhost'
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' -H "$H" http://localhost/ || true)
+            [ "$code" = "200" ] && break
+            echo "waiting for ingress (attempt $i, got $code)"
+            sleep 5
+          done
+          test "$(curl -s -o /dev/null -w '%{http_code}' -H "$H" http://localhost/)" = "200"
+          test "$(curl -s -o /dev/null -w '%{http_code}' -H "$H" http://localhost/api/stats)" = "200"
+          code=$(curl -s -o /tmp/c.json -w '%{http_code}' -X POST -H "$H" \
+            -H 'content-type: application/json' \
+            -d '{"text":"CD smoke: deployment health check complaint","location":"CD Street"}' \
+            http://localhost/api/complaints)
+          echo "POST /api/complaints -> $code"
+          test "$code" = "201"
+          jq -e '.id and .triaged_by' /tmp/c.json
+          echo "ingress smoke OK"
+
+      - name: Cluster evidence
+        if: always()
+        run: |
+          kubectl -n civicpulse get deploy,sts,svc,ingress,hpa,pdb -o wide || true
+          kubectl get nodes -o wide || true

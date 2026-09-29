@@ -19,7 +19,7 @@ A milestone is **not done** until code is committed AND all three artifacts are 
 - NEVER commit `.env`, keys, tokens, passwords. `.env` is gitignored; secrets go to GitHub Secrets / K8s Secret placeholders only. If leaked: rotate + incident note (−20).
 - NEVER deploy `:latest`. Deploy by commit SHA (`${{ github.sha }}`).
 - NEVER use `localhost` for service-to-service calls — Docker/K8s DNS names only (`backend`, `database`, `cache`).
-- ALWAYS pin base images by tag (`python:3.12-slim`, `postgres:16-alpine`, `redis:7-alpine`, `node:22-alpine`, `nginx:1.27-alpine`).
+- ALWAYS pin base images by tag (`python:3.12-slim`, `postgres:16-alpine`, `redis:7-alpine`, `node:22-alpine`, `nginx:1.30.5-alpine3.24`).
 - Postgres = StatefulSet + PVC, never a Deployment. No published DB/cache ports anywhere.
 - `needs:` gates every publishing/deploying CI job.
 - No direct commits to `main` — everything lands via PR into `dev`, then `dev` → `main`.

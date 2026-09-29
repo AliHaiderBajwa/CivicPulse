@@ -1,0 +1,111 @@
+
+
+P01  MUST print TRIAGE_PROVIDER=llm and LLM_MODEL=openai/gpt-oss-120b
+grep -E '^TRIAGE_PROVIDER|^LLM_MODEL' .env
+
+P02  starts the compose stack (idempotent)
+docker compose up -d
+
+P03  MUST print compose:200
+curl -s -o /dev/null -w 'compose:%{http_code}\n' http://localhost:8080/
+
+P04  MUST print k3d:200
+curl -s -o /dev/null -w 'k3d:%{http_code}\n' http://civicpulse.localhost:8081/
+
+==============================================================================
+RECORDING  -  beat by beat
+==============================================================================
+
+### BEAT 1 - CLONE THE PROJECT   [0:30 (0:00-0:30)]
+
+  [0:00] 
+      C01  
+          cd ~/Desktop/"SCD A1"/CivicPulse
+      C02 
+          git clone https://github.com/AliHaiderBajwa/CivicPulse.git
+
+  [0:15] 
+      C03  
+          cd CivicPulse
+
+
+### BEAT 2 - RUNNING SYSTEM   [0:30 (0:30-1:00)]
+
+          docker compose up -d --build
+
+          docker compose ps
+
+
+### BEAT 3 - AI TRIAGE (the money shot)   [0:50 (1:00-1:50)]
+
+
+### BEAT 4 - FALLBACK WHEN THE AI IS DOWN   [0:35 (1:50-2:25)]
+
+          sed -i 's/^TRIAGE_PROVIDER=.*/TRIAGE_PROVIDER=simulated/' .env
+
+          docker compose up -d --force-recreate backend
+
+          curl -s -X POST http://localhost:8000/api/complaints -H 'Content-Type: application/json' -d '{"text":"Water main burst flooding the street near the school","location":"Block 4, Street 12"}' | python3 -m json.tool
+
+
+### BEAT 5 - NETWORK ISOLATION   [0:30 (2:25-2:55)]
+
+          docker compose ps --format '{{.Service}}  {{.Ports}}'
+
+          curl -s -m 3 -o /dev/null -w "db(5432):%{http_code}\n" http://localhost:5432
+      
+          curl -s -m 3 -o /dev/null -w "redis(6379):%{http_code}\n" http://localhost:6379
+
+
+### BEAT 6 - HPA SCALING ON KUBERNETES   [1:00 (2:55-3:55)]
+
+          docker compose down
+      C13 
+          kubectl -n civicpulse get pods
+
+      C14  terminal 1
+          kubectl -n civicpulse get hpa -w
+      C15  terminal 2
+          BASE_URL=http://civicpulse.localhost:8081 k6 run scripts/load/burst.js
+
+
+### BEAT 7 - ROLLBACK   [0:40 (3:55-4:35)]
+
+      C16  
+          kubectl -n civicpulse rollout history deployment/backend
+      C17  
+          kubectl -n civicpulse rollout restart deployment/backend
+      C18  
+          kubectl -n civicpulse rollout status deployment/backend
+
+      C19  
+          kubectl -n civicpulse rollout undo deployment/backend
+      C20 
+          kubectl -n civicpulse rollout status deployment/backend
+      C21  
+          curl -s -o /dev/null -w "still-serving:%{http_code}\n" http://civicpulse.localhost:8081/
+
+
+### BEAT 8 - CLOSE   [0:15 (4:35-4:50)]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+==============================================================================
+restore the machine video ke baad
+==============================================================================
+
+sed -i 's/^TRIAGE_PROVIDER=.*/TRIAGE_PROVIDER=llm/' .env
+docker compose up -d
+

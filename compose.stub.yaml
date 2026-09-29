@@ -1,0 +1,10 @@
+# compose.stub.yaml — TEMPORARY overlay (docs/PLAN.md §2 Step 4, Block 4 swap).
+# Use: docker compose -f compose.yaml -f compose.stub.yaml up -d --build
+# Lets Compose and the frontend run against tools/stub-backend before the real
+# API lands. DELETE this file in Block 4 once backend/ is real.
+services:
+  backend:
+    build:
+      context: ./tools/stub-backend
+    command: ["python", "app.py"]
+    volumes: !reset []

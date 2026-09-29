@@ -1,0 +1,357 @@
+import { useEffect, useState } from 'react';
+import {
+  api,
+  ApiError,
+  type Category,
+  type Priority,
+  type Status,
+} from '../api/client';
+import type { ComplaintPage } from '../api/client';
+
+const PAGE_SIZE = 10;
+
+const CATEGORIES: readonly Category[] = [
+  'water',
+  'electricity',
+  'sanitation',
+  'roads',
+  'streetlights',
+  'other',
+];
+const PRIORITIES: readonly Priority[] = ['high', 'normal', 'low'];
+const STATUSES: readonly Status[] = [
+  'open',
+  'in_progress',
+  'resolved',
+  'rejected',
+];
+
+type Filter<T extends string> = T | '';
+
+export default function DashboardPage() {
+  const [data, setData] = useState<ComplaintPage | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [category, setCategory] = useState<Filter<Category>>('');
+  const [priority, setPriority] = useState<Filter<Priority>>('');
+  const [status, setStatus] = useState<Filter<Status>>('');
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError(null);
+    api
+      .listComplaints({
+        page,
+        page_size: PAGE_SIZE,
+        category: category === '' ? undefined : category,
+        priority: priority === '' ? undefined : priority,
+        status: status === '' ? undefined : status,
+      })
+      .then(({ data: pageData }) => {
+        if (active) setData(pageData);
+      })
+      .catch((err: unknown) => {
+        if (active) {
+          setError(err instanceof Error ? err.message : 'Failed to load complaints');
+        }
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [page, category, priority, status, refreshKey]);
+
+  async function handleStatusChange(id: string, next: Status) {
+    setBusyId(id);
+    try {
+      await api.updateComplaintStatus(id, next);
+      setRowErrors((prev) => {
+        const copy = { ...prev };
+        delete copy[id];
+        return copy;
+      });
+      setRefreshKey((key) => key + 1);
+    } catch (err) {
+      let message: string;
+      if (err instanceof ApiError) {
+        message =
+          typeof err.detail === 'string' ? err.detail : err.message;
+      } else {
+        message = err instanceof Error ? err.message : 'Status update failed';
+      }
+      setRowErrors((prev) => ({ ...prev, [id]: message }));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  function pillFor(kind: 'category' | 'priority' | 'status', value: string): string {
+  if (kind === 'priority') {
+    return value === 'high'
+      ? 'pill pill-red'
+      : value === 'normal'
+        ? 'pill pill-sky'
+        : 'pill pill-slate';
+  }
+  if (kind === 'status') {
+    return value === 'open'
+      ? 'pill pill-sky'
+      : value === 'in_progress'
+        ? 'pill pill-amber'
+        : value === 'resolved'
+          ? 'pill pill-green'
+          : 'pill pill-slate';
+  }
+  return value === 'other' ? 'pill pill-slate' : 'pill pill-sky';
+}
+
+function pageWindow(current: number, total: number): (number | '…')[] {
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+  const keep = new Set([1, 2, current - 1, current, current + 1, total - 1, total]);
+  const pages = Array.from(keep)
+    .filter((n) => n >= 1 && n <= total)
+    .sort((a, b) => a - b);
+  const out: (number | '…')[] = [];
+  let prev = 0;
+  for (const n of pages) {
+    if (n - prev > 1) out.push('…');
+    out.push(n);
+    prev = n;
+  }
+  return out;
+}
+
+const total = data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const filtersActive = category !== '' || priority !== '' || status !== '';
+
+  return (
+    <section aria-labelledby="dashboard-heading">
+      <p className="eyebrow">Live queue</p>
+      <h2 id="dashboard-heading">Operations dashboard</h2>
+      <p className="page-lede">
+        Every filed complaint, filterable and actionable. Changing a status
+        walks the state machine — illegal transitions are refused with a 409.
+      </p>
+
+      <div className="hero-actions">
+        <span className="record-pill">
+          Showing {total} active record{total === 1 ? '' : 's'}
+        </span>
+      </div>
+      <div className="filters">
+        <div className="field">
+          <label htmlFor="filter-category">Category</label>
+          <select
+            id="filter-category"
+            value={category}
+            onChange={(e) => {
+              setCategory(e.target.value as Filter<Category>);
+              setPage(1);
+            }}
+          >
+            <option value="">All</option>
+            {CATEGORIES.map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor="filter-priority">Priority</label>
+          <select
+            id="filter-priority"
+            value={priority}
+            onChange={(e) => {
+              setPriority(e.target.value as Filter<Priority>);
+              setPage(1);
+            }}
+          >
+            <option value="">All</option>
+            {PRIORITIES.map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor="filter-status">Status</label>
+          <select
+            id="filter-status"
+            value={status}
+            onChange={(e) => {
+              setStatus(e.target.value as Filter<Status>);
+              setPage(1);
+            }}
+          >
+            <option value="">All</option>
+            {STATUSES.map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+          </select>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setCategory('');
+            setPriority('');
+            setStatus('');
+            setPage(1);
+          }}
+          disabled={!filtersActive}
+        >
+          Clear filters
+        </button>
+      </div>
+
+      {loading && (
+        <p role="status" className="loading">
+          Loading complaints…
+        </p>
+      )}
+      {error && <p role="alert">{error}</p>}
+
+      {!loading && !error && data && data.items.length === 0 && (
+        <div className="empty-state">
+          <svg
+            width="40"
+            height="40"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <path
+              d="M9 5h11M9 12h11M9 19h11M4 5h.01M4 12h.01M4 19h.01"
+              strokeLinecap="round"
+            />
+          </svg>
+          <p>No complaints match the current filters.</p>
+        </div>
+      )}
+
+      {!loading && !error && data && data.items.length > 0 && (
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Location</th>
+                <th scope="col">Category</th>
+                <th scope="col">Priority</th>
+                <th scope="col">Summary</th>
+                <th scope="col">Provider</th>
+                <th scope="col">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.items.map((complaint) => (
+                <tr key={complaint.id}>
+                  <td>{complaint.location}</td>
+                  <td>
+                    <span className={pillFor('category', complaint.category)}>
+                      {complaint.category}
+                    </span>
+                  </td>
+                  <td>
+                    <span className={pillFor('priority', complaint.priority)}>
+                      {complaint.priority}
+                    </span>
+                  </td>
+                  <td>{complaint.ai_summary ?? complaint.text}</td>
+                  <td>
+                    <span className="pill pill-mono">
+                      {complaint.triaged_by}
+                    </span>
+                  </td>
+                  <td>
+                    <label
+                      className="visually-hidden"
+                      htmlFor={`status-${complaint.id}`}
+                    >
+                      Status for complaint {complaint.id}
+                    </label>
+                    <select
+                      id={`status-${complaint.id}`}
+                      value={complaint.status}
+                      disabled={busyId === complaint.id}
+                      onChange={(e) =>
+                        handleStatusChange(
+                          complaint.id,
+                          e.target.value as Status,
+                        )
+                      }
+                    >
+                      {STATUSES.map((value) => (
+                        <option key={value} value={value}>
+                          {value}
+                        </option>
+                      ))}
+                    </select>
+                    {rowErrors[complaint.id] && (
+                      <p role="alert" className="row-error">
+                        {rowErrors[complaint.id]}
+                      </p>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <div className="pagination">
+        <button
+          type="button"
+          onClick={() => setPage((current) => Math.max(1, current - 1))}
+          disabled={loading || page <= 1}
+        >
+          Previous
+        </button>
+        <span>
+          Page {page} of {totalPages} — {total} complaints
+        </span>
+        <div className="page-numbers" role="group" aria-label="Pages">
+          {pageWindow(page, totalPages).map((entry, index) =>
+            entry === '…' ? (
+              <span key={`gap-${index}`} className="page-gap" aria-hidden="true">
+                …
+              </span>
+            ) : (
+              <button
+                key={entry}
+                type="button"
+                aria-current={entry === page ? 'page' : undefined}
+                onClick={() => setPage(entry)}
+              >
+                {entry}
+              </button>
+            ),
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => setPage((current) => current + 1)}
+          disabled={loading || page >= totalPages}
+        >
+          Next
+        </button>
+      </div>
+    </section>
+  );
+}

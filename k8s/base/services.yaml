@@ -1,0 +1,69 @@
+# All ClusterIP. The database is NEVER NodePort or LoadBalancer — nothing
+# outside the cluster may speak to it, ever.
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: civicpulse
+  labels:
+    app: frontend
+    app.kubernetes.io/part-of: civicpulse
+spec:
+  type: ClusterIP
+  selector:
+    app: frontend
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: civicpulse
+  labels:
+    app: backend
+    app.kubernetes.io/part-of: civicpulse
+spec:
+  type: ClusterIP
+  selector:
+    app: backend
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: database
+  namespace: civicpulse
+  labels:
+    app: database
+    app.kubernetes.io/part-of: civicpulse
+spec:
+  type: ClusterIP
+  selector:
+    app: database
+  ports:
+    - name: pg
+      port: 5432
+      targetPort: pg
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cache
+  namespace: civicpulse
+  labels:
+    app: cache
+    app.kubernetes.io/part-of: civicpulse
+spec:
+  type: ClusterIP
+  selector:
+    app: cache
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: redis
