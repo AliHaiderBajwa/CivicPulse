@@ -792,4 +792,22 @@ demo video kept out of git.
 approves → merge → `cd.yml` runs on `main` → capture green run link +
 fresh GHCR SHAs → upload video → tick J4 + line 91.
 
+## M24 — J4 video live, pack links ticked, submission sent (2026-09-29)
+
+**Expected:** close the loop — video link posted, J4 + line 91 ticked with
+real links, docx regenerated, six Classroom items sent.
+
+**Achieved:**
+- Video uploaded unlisted: https://youtu.be/c7ZRdIc_Tlk (4:55, all seven
+  beats, both voices); link posted on #33 and the issue closed.
+- `docs/RUBRIC-CHECKLIST.md`: J4 ticked with link+duration; line 91
+  ticked with the cd run link, both GHCR SHA refs, video link, shortlog
+  (73/52), HPA capture + chart pointers.
+- `docs/CivicPulse-Documentation.docx` regenerated (final).
+
+**Evidence:** the video link; this branch diff.
+
+**Next:** viva prep — both partners defend any part, including each
+other's code.
+
 <!-- New entries above this line. -->
